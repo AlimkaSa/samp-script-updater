@@ -5232,7 +5232,7 @@ function main()
 
     killList.init()
 
-    sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Скрипт {AA66FF}FastHelperAdm {999999}version 2.1 {CC88FF}успешно загружен", -1)
+    sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Скрипт {AA66FF}FastHelperAdm {999999}version 2.2 {CC88FF}успешно загружен", -1)
     sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Для использования пропишите - {999999}/plmenu", -1)
 
     FHA.threads.autosave = lua_thread.create(function()
