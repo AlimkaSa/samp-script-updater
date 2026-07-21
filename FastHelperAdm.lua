@@ -1,7 +1,7 @@
 -- FastHelperAdm v2.1 (ANSI, CP1251)
 script_name("FastHelperAdm")
 script_author("waldemar03 | Alim Akimov")
-script_version("2.1")
+script_version("2.2")
 
 require "lib.moonloader"
 require "lib.render"
@@ -18,7 +18,7 @@ local u8 = encoding.UTF8
 
 -- ===== АВТООБНОВЛЕНИЕ ЧЕРЕЗ CURL (РАБОТАЕТ ВСЕГДА) =====
 local function checkForUpdate()
-    local currentVersion = 2.1
+    local currentVersion = 2.2
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
     
     -- Функция для скачивания текста через curl
@@ -69,17 +69,17 @@ local function checkForUpdate()
     if remoteNum > currentVersion then
         print(string.format("[FastHelperAdm] Найдено обновление! %s -> %s", currentVersion, remoteNum))
         
-        local tempFile = "fasthelperadm_temp.lua"
-        if downloadFile(repoURL .. "/fasthelperadm.lua", tempFile) then
+        local tempFile = "FastHelperAdm_temp.lua"
+        if downloadFile(repoURL .. "/FastHelperAdm.lua", tempFile) then
             print("[FastHelperAdm] Новый скрипт скачан!")
             
             -- Делаем бэкап старой версии
-            if io.open("fasthelperadm.lua", "r") then
-                os.rename("fasthelperadm.lua", "fasthelperadm.lua.backup")
+            if io.open("FastHelperAdm.lua", "r") then
+                os.rename("FastHelperAdm.lua", "FastHelperAdm.lua.backup")
             end
             
             -- Перемещаем новый скрипт
-            os.rename(tempFile, "fasthelperadm.lua")
+            os.rename(tempFile, "FastHelperAdm.lua")
             
             print("[FastHelperAdm] Обновление применено! Перезагрузите скрипт командой /lua reload")
             printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~/lua reload", 5000)
