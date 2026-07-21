@@ -3,6 +3,9 @@ script_name("FastHelperAdm")
 script_author("waldemar03 | Alim Akimov")
 script_version("2.1")
 
+local CURRENT_VERSION = 2.2
+
+local UPDATE_IN_PROGRESS = false
 require "lib.moonloader"
 require "lib.render"
 local imgui = require "imgui"
@@ -17,20 +20,81 @@ encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
 -- ===== АВТООБНОВЛЕНИЕ ОТ BLASTHACK =====
-local enable_autoupdate = true  -- true = включено, false = выключено
+local enable_autoupdate = true
 local autoupdate_loaded = false
 local Update = nil
 
 if enable_autoupdate then
-    -- Сам модуль обновления (взято из гайда, обёрнуто в pcall для безопасности)
-    local updater_loaded, Updater = pcall(loadstring, [[return {check=function (a,b,c) local d=require('moonloader').download_status;local e=os.tmpname()local f=os.clock()if doesFileExist(e)then os.remove(e)end;downloadUrlToFile(a,e,function(g,h,i,j)if h==d.STATUSEX_ENDDOWNLOAD then if doesFileExist(e)then local k=io.open(e,'r')if k then local l=decodeJson(k:read('*a'))updatelink=l.updateurl;updateversion=l.latest;k:close()os.remove(e)if updateversion~=thisScript().version then lua_thread.create(function(b)local d=require('moonloader').download_status;local m=-1;sampAddChatMessage(b..'Обнаружено обновление. Пытаюсь обновиться c '..thisScript().version..' на '..updateversion,m)wait(250)downloadUrlToFile(updatelink,thisScript().path,function(n,o,p,q)if o==d.STATUS_DOWNLOADINGDATA then print(string.format('Загружено %d из %d.',p,q))elseif o==d.STATUS_ENDDOWNLOADDATA then print('Загрузка обновления завершена.')sampAddChatMessage(b..'Обновление завершено!',m)goupdatestatus=true;lua_thread.create(function()wait(500)thisScript():reload()end)end;if o==d.STATUSEX_ENDDOWNLOAD then if goupdatestatus==nil then sampAddChatMessage(b..'Обновление прошло неудачно. Запускаю устаревшую версию..',m)update=false end end end)end,b)else update=false;print('v'..thisScript().version..': Обновление не требуется.')end end else print('v'..thisScript().version..': Не могу проверить обновление. Смиритесь или проверьте самостоятельно на '..c)update=false end end end)while update~=false and os.clock()-f<10 do wait(100)end;if os.clock()-f>=10 then print('v'..thisScript().version..': timeout, выходим из ожидания проверки обновления. Смиритесь или проверьте самостоятельно на '..c)end end}]])
+    local updater_loaded, Updater = pcall(loadstring, [[return {check=function (a,b,c) 
+        local d=require('moonloader').download_status
+        local e=os.tmpname()
+        local f=os.clock()
+        if doesFileExist(e)then os.remove(e)end
+        
+        downloadUrlToFile(a,e,function(g,h,i,j)
+            if h==d.STATUSEX_ENDDOWNLOAD then 
+                if doesFileExist(e)then 
+                    local k=io.open(e,'r')
+                    if k then 
+                        local l=decodeJson(k:read('*a'))
+                        updatelink=l.updateurl
+                        updateversion=l.latest
+                        k:close()
+                        os.remove(e)
+                        
+                        if updateversion~=thisScript().version then 
+                            lua_thread.create(function(b)
+                                local d=require('moonloader').download_status
+                                local m=-1
+                                sampAddChatMessage(b..'Обнаружено обновление. Пытаюсь обновиться c '..thisScript().version..' на '..updateversion,m)
+                                wait(250)
+                                downloadUrlToFile(updatelink,thisScript().path,function(n,o,p,q)
+                                    if o==d.STATUS_DOWNLOADINGDATA then 
+                                        print(string.format('Загружено %d из %d.',p,q))
+                                    elseif o==d.STATUS_ENDDOWNLOADDATA then 
+                                        print('Загрузка обновления завершена.')
+                                        sampAddChatMessage(b..'Обновление завершено!',m)
+                                        goupdatestatus=true
+                                        lua_thread.create(function() 
+                                            wait(1000) 
+                                            
+                                            -- ====== ИСПРАВЛЕНИЕ БЕСКОНЕЧНОГО ЦИКЛА ======
+                                            local UPDATE_IN_PROGRESS = true
+                                            thisScript():reload()
+                                            -- ============================================
+                                        end)
+                                    end
+                                    if o==d.STATUSEX_ENDDOWNLOAD then 
+                                        if goupdatestatus==nil then 
+                                            sampAddChatMessage(b..'Обновление прошло неудачно. Запускаю устаревшую версию..',m)
+                                            update=false 
+                                        end 
+                                    end
+                                end)
+                            end,b)
+                        else 
+                            update=false
+                            if UPDATE_IN_PROGRESS == nil or UPDATE_IN_PROGRESS == false then
+                                print('v'..thisScript().version..': Обновление не требуется.')
+                            else
+                                print('v'..thisScript().version..': Обновление успешно установлено!')
+                            end
+                        end
+                    end 
+                else 
+                    print('v'..thisScript().version..': Не могу проверить обновление. Смиритесь или проверьте самостоятельно на '..c)
+                    update=false 
+                end 
+            end
+        end)
+        
+        while update~=false and os.clock()-f<10 do wait(100)end
+        if os.clock()-f>=10 then print('v'..thisScript().version..': timeout, выходим из ожидания проверки обновления. Смиритесь или проверьте самостоятельно на '..c)end
+    end}]])
     
     if updater_loaded then
         autoupdate_loaded, Update = pcall(Updater)
         if autoupdate_loaded then
-            -- =======================================================
-            -- ЗДЕСЬ ТВОИ ССЫЛКИ!
-            -- =======================================================
             Update.json_url = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main/version.json?" .. tostring(os.clock())
             Update.prefix = "[FastHelperAdm]: "
             Update.url = "https://github.com/AlimkaSa/samp-script-updater/"
@@ -5115,9 +5179,13 @@ function main()
     
     repeat wait(0) until isSampAvailable()
     
-        -- ===== ЗАПУСК ОБНОВЛЕНИЯ =====
+    -- ===== ЗАПУСК ОБНОВЛЕНИЯ =====
     if autoupdate_loaded and enable_autoupdate and Update then
-        pcall(Update.check, Update.json_url, Update.prefix, Update.url)
+        if not UPDATE_IN_PROGRESS then
+            pcall(Update.check, Update.json_url, Update.prefix, Update.url)
+        else
+            UPDATE_IN_PROGRESS = false
+        end
     end
     -- ===== КОНЕЦ ЗАПУСКА =====
 
@@ -5183,7 +5251,7 @@ function main()
 
     killList.init()
 
-    sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Скрипт {AA66FF}FastHelperAdm {999999}version 2.1 {CC88FF}успешно загружен", -1)
+    sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Скрипт {AA66FF}FastHelperAdm {999999}version 2.2 {CC88FF}успешно загружен", -1)
     sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Для использования пропишите - {999999}/plmenu", -1)
 
     FHA.threads.autosave = lua_thread.create(function()
