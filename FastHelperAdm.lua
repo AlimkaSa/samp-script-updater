@@ -16,7 +16,7 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== АВТООБНОВЛЕНИЕ (ИДЕАЛЬНАЯ ВЕРСИЯ + КОДИРОВКА) =====
+-- ===== АВТООБНОВЛЕНИЕ (ПРОСТОЙ И НАДЁЖНЫЙ) =====
 local function checkForUpdate()
     local CURRENT_VERSION = 2.2
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
@@ -24,7 +24,6 @@ local function checkForUpdate()
     
     -- Получаем полный путь к скрипту
     local scriptPath = getWorkingDirectory() .. "\\" .. scriptName
-    local backupPath = scriptPath .. ".backup"
     local tempPath = getWorkingDirectory() .. "\\FastHelperAdm_temp.lua"
     
     -- Функция для скачивания текста через curl
@@ -41,7 +40,7 @@ local function checkForUpdate()
         return nil
     end
     
-    -- Функция для скачивания файла (БЕЗ КОНВЕРТАЦИИ!)
+    -- Функция для скачивания файла
     local function downloadFile(url, filename)
         os.execute('curl -s --connect-timeout 10 "' .. url .. '" -o "' .. filename .. '"')
         local file = io.open(filename, "r")
@@ -68,7 +67,7 @@ local function checkForUpdate()
     -- Есть обновление!
     print(string.format("[FastHelperAdm] Найдено обновление! %s -> %s", CURRENT_VERSION, remoteNum))
     
-    -- Скачиваем в temp файл (в корень GTA)
+    -- Скачиваем в temp файл
     if not downloadFile(repoURL .. "/" .. scriptName, tempPath) then
         print("[FastHelperAdm] Ошибка скачивания!")
         return
@@ -82,47 +81,22 @@ local function checkForUpdate()
     end
     testFile:close()
     
-    -- Проверяем, что в скачанном файле правильная версия
-    local newContent = io.open(tempPath, "r"):read("*a")
-    if not newContent or not newContent:find("CURRENT_VERSION = 2.2") then
-        print("[FastHelperAdm] Ошибка: скачанный файл содержит старую версию!")
-        os.remove(tempPath)
-        return
-    end
-    
-    -- Делаем бэкап старого файла
+    -- УДАЛЯЕМ старый файл
     if io.open(scriptPath, "r") then
-        os.rename(scriptPath, backupPath)
+        os.remove(scriptPath)
     end
     
-    -- ===== ГЛАВНОЕ ИЗМЕНЕНИЕ ОТ АЛИСЫ =====
-    -- Записываем файл С УКАЗАНИЕМ КОДИРОВКИ Windows-1251 (ANSI)!
-    local newFile = io.open(scriptPath, "w; Windows-1251")
-    if newFile then
-        newFile:write(newContent)
-        newFile:close()
-        print("[FastHelperAdm] Файл успешно заменён на 2.2 в кодировке ANSI!")
-    else
-        print("[FastHelperAdm] Ошибка замены файла!")
-        os.rename(backupPath, scriptPath)
-        return
-    end
-    
-    -- Удаляем временный файл
-    if io.open(tempPath, "r") then
-        os.remove(tempPath)
-        print("[FastHelperAdm] Временный файл удалён!")
-    end
+    -- ПЕРЕИМЕНОВЫВАЕМ temp в основной
+    os.rename(tempPath, scriptPath)
     
     print("[FastHelperAdm] Обновление установлено на версию " .. remoteNum .. "!")
     printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Версия " .. remoteNum, 3000)
     
-    -- Перезагрузка
+    -- ПЕРЕЗАГРУЗКА
     lua_thread.create(function()
         wait(1500)
         for _, scr in ipairs(script.list()) do
             if scr.filename == scriptPath or scr.filename:match("FastHelperAdm%.lua$") then
-                print("[FastHelperAdm] Выгружаю скрипт: " .. scr.filename)
                 scr:unload()
                 break
             end
