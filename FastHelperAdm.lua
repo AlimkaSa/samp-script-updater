@@ -17,9 +17,10 @@ encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
 -- ===== АВТООБНОВЛЕНИЕ (КАК В GRANDTOOLS) =====
+-- Версия хранится ЗДЕСЬ (жёстко прописана)
+local CURRENT_VERSION = 2.2  -- ← ЭТО МЕНЯТЬ ПРИ ОБНОВЛЕНИИ!
+
 local function checkForUpdate()
-    -- Версия берётся из script_version()!
-    local currentVersion = tonumber(script_version():match("(%d+%.%d+)")) or 2.1
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
     local scriptName = "FastHelperAdm.lua"
     
@@ -56,12 +57,12 @@ local function checkForUpdate()
     remoteVer = remoteVer:gsub("%s+", "")
     local remoteNum = tonumber(remoteVer)
     
-    if not remoteNum or remoteNum <= currentVersion then
+    if not remoteNum or remoteNum <= CURRENT_VERSION then
         return
     end
     
     -- Есть обновление!
-    print(string.format("[FastHelperAdm] Найдено обновление! %s -> %s", currentVersion, remoteNum))
+    print(string.format("[FastHelperAdm] Найдено обновление! %s -> %s", CURRENT_VERSION, remoteNum))
     
     local tempFile = "FastHelperAdm_temp.lua"
     if not downloadFile(repoURL .. "/" .. scriptName, tempFile) then
@@ -86,7 +87,7 @@ local function checkForUpdate()
     print("[FastHelperAdm] Обновление установлено на версию " .. remoteNum .. "!")
     printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Версия " .. remoteNum, 3000)
     
-    -- ПЕРЕЗАГРУЖАЕМ КАК В GRANDTOOLS
+    -- Перезагружаем как в GrandTools
     lua_thread.create(function()
         wait(1500)
         -- Выгружаем старый скрипт
@@ -5247,7 +5248,7 @@ function main()
 
     killList.init()
 
-    sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Скрипт {AA66FF}FastHelperAdm {999999}version 2.1 {CC88FF}успешно загружен", -1)
+    sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Скрипт {AA66FF}FastHelperAdm {999999}version 2.2 {CC88FF}успешно загружен", -1)
     sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Для использования пропишите - {999999}/plmenu", -1)
 
     FHA.threads.autosave = lua_thread.create(function()
