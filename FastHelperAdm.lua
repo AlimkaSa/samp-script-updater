@@ -63,7 +63,7 @@ local function checkForUpdate()
     print(string.format("[FastHelperAdm] Найдено обновление! %s -> %s", currentVersion, remoteNum))
     
     local tempFile = "FastHelperAdm_temp.lua"
-    if not downloadFile(repoURL .. "/FastHelperAdm.lua", tempFile) then
+    if not downloadFile(repoURL .. "/" .. scriptName, tempFile) then
         print("[FastHelperAdm] Ошибка скачивания!")
         return
     end
@@ -82,20 +82,9 @@ local function checkForUpdate()
     end
     os.rename(tempFile, scriptName)
     
-    print("[FastHelperAdm] Обновление установлено! Перезагрузка...")
-    printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Перезагрузка...", 3000)
-    
-    -- ПЕРЕЗАГРУЖАЕМ СКРИПТ (правильный способ!)
-    lua_thread.create(function()
-        wait(1500)
-        -- Находим текущий скрипт и перезагружаем его через reload()
-        for _, scr in ipairs(script.list()) do
-            if scr.filename == scriptName then
-                scr:reload()  -- ← ВОТ ТАК ПРАВИЛЬНО!
-                break
-            end
-        end
-    end)
+    print("[FastHelperAdm] Обновление установлено на версию " .. remoteNum .. "!")
+    print("[FastHelperAdm] Перезагрузите скрипт (Ctrl+R) для применения")
+    printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Нажмите Ctrl+R", 4000)
 end
 
 -- Запускаем проверку
