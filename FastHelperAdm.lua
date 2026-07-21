@@ -16,18 +16,18 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== АВТООБНОВЛЕНИЕ (ИДЕАЛЬНАЯ ВЕРСИЯ + КОДИРОВКА) =====
+-- ===== РђР’РўРћРћР‘РќРћР’Р›Р•РќРР• (РЎ РљРћРќР’Р•Р РўРђР¦РР•Р™ Р’ ANSI) =====
 local function checkForUpdate()
     local CURRENT_VERSION = 2.2
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
     local scriptName = "FastHelperAdm.lua"
     
-    -- Получаем полный путь к скрипту
+    -- РџРѕР»СѓС‡Р°РµРј РїРѕР»РЅС‹Р№ РїСѓС‚СЊ Рє СЃРєСЂРёРїС‚Сѓ
     local scriptPath = getWorkingDirectory() .. "\\" .. scriptName
     local backupPath = scriptPath .. ".backup"
-    local tempPath = getWorkingDirectory() .. "\\FastHelperAdm_temp.lua"
+    local tempPath = scriptPath .. ".temp"
     
-    -- Функция для скачивания текста через curl
+    -- Р¤СѓРЅРєС†РёСЏ РґР»СЏ СЃРєР°С‡РёРІР°РЅРёСЏ С‚РµРєСЃС‚Р° С‡РµСЂРµР· curl
     local function downloadText(url)
         local tempFile = os.tmpname()
         os.execute('curl -s --connect-timeout 5 "' .. url .. '" -o "' .. tempFile .. '"')
@@ -41,7 +41,7 @@ local function checkForUpdate()
         return nil
     end
     
-    -- Функция для скачивания файла (БЕЗ КОНВЕРТАЦИИ!)
+    -- Р¤СѓРЅРєС†РёСЏ РґР»СЏ СЃРєР°С‡РёРІР°РЅРёСЏ С„Р°Р№Р»Р°
     local function downloadFile(url, filename)
         os.execute('curl -s --connect-timeout 10 "' .. url .. '" -o "' .. filename .. '"')
         local file = io.open(filename, "r")
@@ -52,7 +52,21 @@ local function checkForUpdate()
         return false
     end
     
-    -- Проверяем версию на GitHub
+    -- Р¤СѓРЅРєС†РёСЏ РєРѕРЅРІРµСЂС‚Р°С†РёРё UTF-8 в†’ ANSI (Windows-1251)
+    local function utf8ToAnsi(str)
+        if not str then return "" end
+        -- РџСЂРѕР±СѓРµРј С‡РµСЂРµР· encoding (СЃР°РјС‹Р№ РЅР°РґС‘Р¶РЅС‹Р№ СЃРїРѕСЃРѕР±)
+        local encoding = require("encoding")
+        if encoding then
+            encoding.default = "CP1251"
+            local utf8 = encoding.UTF8
+            local ansi = encoding.ANSI
+            return ansi:decode(utf8:encode(str))
+        end
+        return str
+    end
+    
+    -- РџСЂРѕРІРµСЂСЏРµРј РІРµСЂСЃРёСЋ РЅР° GitHub
     local remoteVer = downloadText(repoURL .. "/version.txt")
     if not remoteVer then
         return
@@ -65,64 +79,61 @@ local function checkForUpdate()
         return
     end
     
-    -- Есть обновление!
-    print(string.format("[FastHelperAdm] Найдено обновление! %s -> %s", CURRENT_VERSION, remoteNum))
+    -- Р•СЃС‚СЊ РѕР±РЅРѕРІР»РµРЅРёРµ!
+    print(string.format("[FastHelperAdm] РќР°Р№РґРµРЅРѕ РѕР±РЅРѕРІР»РµРЅРёРµ! %s -> %s", CURRENT_VERSION, remoteNum))
     
-    -- Скачиваем в temp файл (в корень GTA)
+    -- РЎРєР°С‡РёРІР°РµРј РІ temp С„Р°Р№Р»
     if not downloadFile(repoURL .. "/" .. scriptName, tempPath) then
-        print("[FastHelperAdm] Ошибка скачивания!")
+        print("[FastHelperAdm] РћС€РёР±РєР° СЃРєР°С‡РёРІР°РЅРёСЏ!")
         return
     end
     
-    -- Проверяем, что скачалось
+    -- РџСЂРѕРІРµСЂСЏРµРј, С‡С‚Рѕ СЃРєР°С‡Р°Р»РѕСЃСЊ
     local testFile = io.open(tempPath, "r")
     if not testFile then
-        print("[FastHelperAdm] Файл не скачан!")
+        print("[FastHelperAdm] Р¤Р°Р№Р» РЅРµ СЃРєР°С‡Р°РЅ!")
         return
     end
     testFile:close()
     
-    -- Проверяем, что в скачанном файле правильная версия
+    -- РџСЂРѕРІРµСЂСЏРµРј, С‡С‚Рѕ РІ СЃРєР°С‡Р°РЅРЅРѕРј С„Р°Р№Р»Рµ РїСЂР°РІРёР»СЊРЅР°СЏ РІРµСЂСЃРёСЏ
     local newContent = io.open(tempPath, "r"):read("*a")
     if not newContent or not newContent:find("CURRENT_VERSION = 2.2") then
-        print("[FastHelperAdm] Ошибка: скачанный файл содержит старую версию!")
+        print("[FastHelperAdm] РћС€РёР±РєР°: СЃРєР°С‡Р°РЅРЅС‹Р№ С„Р°Р№Р» СЃРѕРґРµСЂР¶РёС‚ СЃС‚Р°СЂСѓСЋ РІРµСЂСЃРёСЋ!")
         os.remove(tempPath)
         return
     end
     
-    -- Делаем бэкап старого файла
+    -- ===== РљРћРќР’Р•Р РўРђР¦РРЇ UTF-8 в†’ ANSI =====
+    local ansiContent = utf8ToAnsi(newContent)
+    
+    -- Р”РµР»Р°РµРј Р±СЌРєР°Рї
     if io.open(scriptPath, "r") then
         os.rename(scriptPath, backupPath)
     end
     
-    -- ===== ГЛАВНОЕ ИЗМЕНЕНИЕ ОТ АЛИСЫ =====
-    -- Записываем файл С УКАЗАНИЕМ КОДИРОВКИ Windows-1251 (ANSI)!
-    local newFile = io.open(scriptPath, "w; Windows-1251")
+    -- Р—Р°РїРёСЃС‹РІР°РµРј РІ ANSI
+    local newFile = io.open(scriptPath, "w")
     if newFile then
-        newFile:write(newContent)
+        newFile:write(ansiContent)
         newFile:close()
-        print("[FastHelperAdm] Файл успешно заменён на 2.2 в кодировке ANSI!")
+        os.remove(tempPath)
+        print("[FastHelperAdm] Р¤Р°Р№Р» СѓСЃРїРµС€РЅРѕ Р·Р°РјРµРЅС‘РЅ РЅР° 2.2 РІ ANSI!")
     else
-        print("[FastHelperAdm] Ошибка замены файла!")
+        print("[FastHelperAdm] РћС€РёР±РєР° Р·Р°РјРµРЅС‹ С„Р°Р№Р»Р°!")
         os.rename(backupPath, scriptPath)
         return
     end
     
-    -- Удаляем временный файл
-    if io.open(tempPath, "r") then
-        os.remove(tempPath)
-        print("[FastHelperAdm] Временный файл удалён!")
-    end
+    print("[FastHelperAdm] РћР±РЅРѕРІР»РµРЅРёРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅРѕ РЅР° РІРµСЂСЃРёСЋ " .. remoteNum .. "!")
+    printStringNow("~g~FastHelperAdm~w~: ~y~РћР±РЅРѕРІР»РµРЅРёРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅРѕ!~n~~w~Р’РµСЂСЃРёСЏ " .. remoteNum, 3000)
     
-    print("[FastHelperAdm] Обновление установлено на версию " .. remoteNum .. "!")
-    printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Версия " .. remoteNum, 3000)
-    
-    -- Перезагрузка
+    -- РџРµСЂРµР·Р°РіСЂСѓР·РєР°
     lua_thread.create(function()
         wait(1500)
         for _, scr in ipairs(script.list()) do
             if scr.filename == scriptPath or scr.filename:match("FastHelperAdm%.lua$") then
-                print("[FastHelperAdm] Выгружаю скрипт: " .. scr.filename)
+                print("[FastHelperAdm] Р’С‹РіСЂСѓР¶Р°СЋ СЃРєСЂРёРїС‚: " .. scr.filename)
                 scr:unload()
                 break
             end
@@ -132,14 +143,14 @@ local function checkForUpdate()
     end)
 end
 
--- Запускаем проверку
+-- Р—Р°РїСѓСЃРєР°РµРј РїСЂРѕРІРµСЂРєСѓ
 lua_thread.create(function()
     wait(3000)
     checkForUpdate()
 end)
--- ===== КОНЕЦ АВТООБНОВЛЕНИЯ =====
+-- ===== РљРћРќР•Р¦ РђР’РўРћРћР‘РќРћР’Р›Р•РќРРЇ =====
 
--- ===== ADMIN RENDER СТРУКТУРА =====
+-- ===== ADMIN RENDER РЎРўР РЈРљРўРЈР Рђ =====
 local adminRender = {
     enabled = imgui.ImBool(false),
     showLvl = imgui.ImBool(true),
@@ -168,7 +179,7 @@ local adminRender = {
     lvlFilter = {true, true, true, true, true, true, true, true, true, true, true, true, true, true},
 }
 
--- ===== ФУНКЦИИ ДЛЯ РАБОТЫ С ЦВЕТАМИ =====
+-- ===== Р¤РЈРќРљР¦РР Р”Р›РЇ Р РђР‘РћРўР« РЎ Р¦Р’Р•РўРђРњР =====
 function join_argb(r, g, b, a)
     a = a or 255
     local argb = math.floor(b)
@@ -186,7 +197,7 @@ function explode_argb(argb)
     return a, r, g, b
 end
 
--- ===== KILL LIST ID МОДУЛЬ =====
+-- ===== KILL LIST ID РњРћР”РЈР›Р¬ =====
 local killList = {
     enabled = false,
     ptr = nil,
@@ -282,7 +293,7 @@ function killList.onDeath(killerId, killedId, reason)
     end)
 end
 
--- ===== WALLHACK МОДУЛЬ =====
+-- ===== WALLHACK РњРћР”РЈР›Р¬ =====
 local mem = require "memory"
 local getBonePosition = ffi.cast("int (__thiscall*)(void*, float*, int, bool)", 0x5E4280)
 
@@ -398,7 +409,7 @@ local function wh_thread()
     end
 end
 
--- ===== ADMIN RENDER ФУНКЦИИ =====
+-- ===== ADMIN RENDER Р¤РЈРќРљР¦РР =====
 function adminRender.init()
     if adminRender.initialized then return end
     adminRender.font = renderCreateFont("Arial", 10, 1 + 8)
@@ -427,16 +438,16 @@ function adminRender.onServerMessage(color, text)
     
     local cleanText = text:gsub("{%x%x%x%x%x%x}", "")
     
-    -- Пропускаем заголовок
-    if cleanText:find("Администрация в сети:") or cleanText:find("Администраторы онлайн") then
+    -- РџСЂРѕРїСѓСЃРєР°РµРј Р·Р°РіРѕР»РѕРІРѕРє
+    if cleanText:find("РђРґРјРёРЅРёСЃС‚СЂР°С†РёСЏ РІ СЃРµС‚Рё:") or cleanText:find("РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂС‹ РѕРЅР»Р°Р№РЅ") then
         return true
     end
     
-    -- Парсим: "Nickname[ID] (LVL lvl) [AFK]"
+    -- РџР°СЂСЃРёРј: "Nickname[ID] (LVL lvl) [AFK]"
     local nick, id, lvl, action = 
         cleanText:match("([^%[]+)%[(%d+)%] %((%d+) lvl%)(.*)")
     
-    -- Альтернативный формат: "Nickname [ID] - LVL lvl"
+    -- РђР»СЊС‚РµСЂРЅР°С‚РёРІРЅС‹Р№ С„РѕСЂРјР°С‚: "Nickname [ID] - LVL lvl"
     if not nick then
         nick, id, lvl, action = 
             cleanText:match("([^%[]+)%[(%d+)%] %- (%d+) lvl(.*)")
@@ -475,11 +486,11 @@ function adminRender.draw()
     if not adminRender.enabled.v then return end
     if not adminRender.initialized then adminRender.init() end
     
-    -- Если админов нет, показываем статус
+    -- Р•СЃР»Рё Р°РґРјРёРЅРѕРІ РЅРµС‚, РїРѕРєР°Р·С‹РІР°РµРј СЃС‚Р°С‚СѓСЃ
     if #adminRender.admins == 0 then
         local posX = adminRender.posX
         local posY = adminRender.posY
-        renderFontDrawText(adminRender.font, "Администраторы: загрузка...", posX, posY, -1)
+        renderFontDrawText(adminRender.font, "РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂС‹: Р·Р°РіСЂСѓР·РєР°...", posX, posY, -1)
         return
     end
     
@@ -491,7 +502,7 @@ function adminRender.draw()
     local posX = adminRender.posX
     local posY = adminRender.posY
     
-    local header = string.format("Администраторы {00ff00}online{ffffff} [ %s | {ff0000}AFK: %s{ffffff} | {32CD32}/re: %s{ffffff} ]:", 
+    local header = string.format("РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂС‹ {00ff00}online{ffffff} [ %s | {ff0000}AFK: %s{ffffff} | {32CD32}/re: %s{ffffff} ]:", 
         #adminRender.admins, adminRender.afk, adminRender.recon)
     
     renderFontDrawText(adminRender.font, header, posX, posY - 20, -1)
@@ -641,28 +652,28 @@ function adminRender.loadFilter()
     end
 end
 
--- ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =====
+-- ===== Р“Р›РћР‘РђР›Р¬РќР«Р• РџР•Р Р•РњР•РќРќР«Р• =====
 FastHelperAdm = FastHelperAdm or {}
 FHA = FastHelperAdm
 FHA.threads = {}
 FHA.isUnloading = false
 FHA.isImguiInteracting = false
 
--- ===== АВТОЛОГИН =====
+-- ===== РђР’РўРћР›РћР“РРќ =====
 FHA.autoLogin = {
     enabled = imgui.ImBool(false),
     password = imgui.ImBuffer(128),
     showPassword = imgui.ImBool(false)
 }
 
--- ===== СИСТЕМА ОТВЕТОВ НА РЕПОРТЫ =====
+-- ===== РЎРРЎРўР•РњРђ РћРўР’Р•РўРћР’ РќРђ Р Р•РџРћР РўР« =====
 FHA.reports = {}
 FHA.MAX_REPORTS = 15
 FHA.REPORT_LIFETIME = 120
 FHA.selectedReport = nil
 FHA.answerText = imgui.ImBuffer(256)
 
--- ===== ПРАВИЛА СЕРВЕРОВ =====
+-- ===== РџР РђР’РР›Рђ РЎР•Р Р’Р•Р РћР’ =====
 FHA.rulesMode = 1
 FHA.rulesSearch = imgui.ImBuffer(128)
 FHA.rulesSectionStates = {true, true, true, true, true, true}
@@ -686,12 +697,12 @@ FHA.PRIZE_IDS = {
     DRUGS          = 16
 }
 
--- ===== ФУНКЦИЯ ЗАГРУЗКИ ТЕКСТОВЫХ ФАЙЛОВ =====
+-- ===== Р¤РЈРќРљР¦РРЇ Р—РђР“Р РЈР—РљР РўР•РљРЎРўРћР’Р«РҐ Р¤РђР™Р›РћР’ =====
 function FHA_loadTextFile(path)
     local t = {}
     local f = io.open(path, "r")
     if not f then 
-        table.insert(t, "Файл не найден: " .. path)
+        table.insert(t, "Р¤Р°Р№Р» РЅРµ РЅР°Р№РґРµРЅ: " .. path)
         return t
     end
     
@@ -711,30 +722,30 @@ FHA.rulesPride = {server = {}, admin = {}, aad = {}, goss = {}, capt = {}, bizwa
 FHA.rulesAnger = {server = {}, admin = {}, aad = {}, goss = {}, capt = {}, bizwar = {}}
 
 FHA.rulesEnvyNames = {
-    "ENVY | Правила Сервера",
-    "ENVY | Правила Администрации",
-    "ENVY | Правила использования /aad и /o",
-    "ENVY | Общие правила Goss",
-    "ENVY | Правила каптов",
-    "ENVY | Правила стрел bizwar"
+    "ENVY | РџСЂР°РІРёР»Р° РЎРµСЂРІРµСЂР°",
+    "ENVY | РџСЂР°РІРёР»Р° РђРґРјРёРЅРёСЃС‚СЂР°С†РёРё",
+    "ENVY | РџСЂР°РІРёР»Р° РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ /aad Рё /o",
+    "ENVY | РћР±С‰РёРµ РїСЂР°РІРёР»Р° Goss",
+    "ENVY | РџСЂР°РІРёР»Р° РєР°РїС‚РѕРІ",
+    "ENVY | РџСЂР°РІРёР»Р° СЃС‚СЂРµР» bizwar"
 }
 
 FHA.rulesPrideNames = {
-    "PRIDE | Правила Сервера",
-    "PRIDE | Правила Администраций",
-    "PRIDE | Правила Использования /aad и /o",
-    "PRIDE | Общие правила Goss",
-    "PRIDE | Правила Каптов",
-    "PRIDE | Правила стрел bizwar"
+    "PRIDE | РџСЂР°РІРёР»Р° РЎРµСЂРІРµСЂР°",
+    "PRIDE | РџСЂР°РІРёР»Р° РђРґРјРёРЅРёСЃС‚СЂР°С†РёР№",
+    "PRIDE | РџСЂР°РІРёР»Р° РСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ /aad Рё /o",
+    "PRIDE | РћР±С‰РёРµ РїСЂР°РІРёР»Р° Goss",
+    "PRIDE | РџСЂР°РІРёР»Р° РљР°РїС‚РѕРІ",
+    "PRIDE | РџСЂР°РІРёР»Р° СЃС‚СЂРµР» bizwar"
 }
 
 FHA.rulesAngerNames = {
-    "ANGER | Правила Сервера",
-    "ANGER | Правила Администрации",
-    "ANGER | Правила использования /aad и /o",
-    "ANGER | Общие правила Goss",
-    "ANGER | Правила каптов",
-    "ANGER | Правила стрел bizwar"
+    "ANGER | РџСЂР°РІРёР»Р° РЎРµСЂРІРµСЂР°",
+    "ANGER | РџСЂР°РІРёР»Р° РђРґРјРёРЅРёСЃС‚СЂР°С†РёРё",
+    "ANGER | РџСЂР°РІРёР»Р° РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ /aad Рё /o",
+    "ANGER | РћР±С‰РёРµ РїСЂР°РІРёР»Р° Goss",
+    "ANGER | РџСЂР°РІРёР»Р° РєР°РїС‚РѕРІ",
+    "ANGER | РџСЂР°РІРёР»Р° СЃС‚СЂРµР» bizwar"
 }
 
 function FHA_loadEnvyRules()
@@ -764,7 +775,7 @@ function FHA_loadAngerRules()
     FHA.rulesAnger.bizwar = FHA_loadTextFile(rulesAngerPath .. "rules_bizwar_anger.txt")
 end
 
--- ===== ФУНКЦИЯ СОЗДАНИЯ СИНХРОДАННЫХ =====
+-- ===== Р¤РЈРќРљР¦РРЇ РЎРћР—Р”РђРќРРЇ РЎРРќРҐР РћР”РђРќРќР«РҐ =====
 function samp_create_sync_data(arg_4_0, arg_4_1)
     local var_4_0 = require("ffi")
     local var_4_1 = require("sampfuncs")
@@ -858,7 +869,7 @@ function samp_create_sync_data(arg_4_0, arg_4_1)
     }, var_4_13)
 end
 
--- ===== ФУНКЦИИ ДЛЯ ПРАВИЛ =====
+-- ===== Р¤РЈРќРљР¦РР Р”Р›РЇ РџР РђР’РР› =====
 local function normalize(str)
     if not str then return "" end
     return tostring(str):lower()
@@ -878,7 +889,7 @@ function FHA_removeReport(index)
     FHA.answerText.v = ""
 end
 
--- ===== INPUT МЕНЕДЖЕР =====
+-- ===== INPUT РњР•РќР•Р”Р–Р•Р  =====
 Input = {
     binds = {},
     
@@ -1012,33 +1023,33 @@ function FHA_givePrize(playerId, prizeId, value)
     return true
 end
 
--- ===== ZZVEH ФУНКЦИЯ (обход зелёной зоны) =====
+-- ===== ZZVEH Р¤РЈРќРљР¦РРЇ (РѕР±С…РѕРґ Р·РµР»С‘РЅРѕР№ Р·РѕРЅС‹) =====
 function FHA_createCarInZZ()
     local st = FHA.state
     lua_thread.create(function()
         if FHA.isUnloading then return end
         
-        -- Запоминаем позицию игрока
+        -- Р—Р°РїРѕРјРёРЅР°РµРј РїРѕР·РёС†РёСЋ РёРіСЂРѕРєР°
         local x, y, z = getCharCoordinates(PLAYER_PED)
         
         st.zzvehAct = true
         
         wait(1050)
         
-        -- Отправляем /veh с сохранёнными параметрами
+        -- РћС‚РїСЂР°РІР»СЏРµРј /veh СЃ СЃРѕС…СЂР°РЅС‘РЅРЅС‹РјРё РїР°СЂР°РјРµС‚СЂР°РјРё
         sampSendChat("/veh " .. st.zzvehId .. " " .. st.zzvehC1 .. " " .. st.zzvehC2)
         wait(500)
         
         st.zzvehAct = false
         
-        -- Возвращаем игрока на место
+        -- Р’РѕР·РІСЂР°С‰Р°РµРј РёРіСЂРѕРєР° РЅР° РјРµСЃС‚Рѕ
         setCharCoordinates(PLAYER_PED, x, y, z)
         
         st.zzvehActive = false
     end)
 end
 
--- ===== СТИЛИ =====
+-- ===== РЎРўРР›Р =====
 function FHA_ApplyRedStyle()
     local style = imgui.GetStyle()
     local c = style.Colors
@@ -1149,7 +1160,7 @@ function FHA_ApplyRainbowStyle()
     c[imgui.Col.ButtonActive] = imgui.ImVec4(r, g, b, 1.00)
 end
 
--- ===== ГЛОБАЛЬНОЕ СОСТОЯНИЕ =====
+-- ===== Р“Р›РћР‘РђР›Р¬РќРћР• РЎРћРЎРўРћРЇРќРР• =====
 FHA.state = {
     showMenu = imgui.ImBool(false),
     selectedTab = 1,
@@ -1157,8 +1168,8 @@ FHA.state = {
     lastSendTime = 0,
     cooldown = 1.0,
     fastCodes = {
-        o="Ожидайте",y="Уточните",go="Уже иду",hel="Помог",sg="Свободная группа",
-        non="Нет в сети",per="Передам",otk="Отказ",rp="РП путём",s="Слежу"
+        o="РћР¶РёРґР°Р№С‚Рµ",y="РЈС‚РѕС‡РЅРёС‚Рµ",go="РЈР¶Рµ РёРґСѓ",hel="РџРѕРјРѕРі",sg="РЎРІРѕР±РѕРґРЅР°СЏ РіСЂСѓРїРїР°",
+        non="РќРµС‚ РІ СЃРµС‚Рё",per="РџРµСЂРµРґР°Рј",otk="РћС‚РєР°Р·",rp="Р Рџ РїСѓС‚С‘Рј",s="РЎР»РµР¶Сѓ"
     },
     
     adminLevel = imgui.ImInt(1),
@@ -1265,23 +1276,23 @@ FHA.state = {
     arr_chat = {'aad','o'},
     combo_chat = imgui.ImInt(0),
     arr_priz = {
-        u8'Уровень',u8'Законопослушность',u8'Материалы',u8'Убийства',
-        u8'Номер телефона',u8'EXP',u8'Деньги в банке',
-        u8'Деньги на мобиле',u8'Наличные деньги',u8'Аптечки',
-        u8'Бокс',u8'Kung-Fu',u8'KickBox',u8'Наркозависимость',u8'Наркотики'
+        u8'РЈСЂРѕРІРµРЅСЊ',u8'Р—Р°РєРѕРЅРѕРїРѕСЃР»СѓС€РЅРѕСЃС‚СЊ',u8'РњР°С‚РµСЂРёР°Р»С‹',u8'РЈР±РёР№СЃС‚РІР°',
+        u8'РќРѕРјРµСЂ С‚РµР»РµС„РѕРЅР°',u8'EXP',u8'Р”РµРЅСЊРіРё РІ Р±Р°РЅРєРµ',
+        u8'Р”РµРЅСЊРіРё РЅР° РјРѕР±РёР»Рµ',u8'РќР°Р»РёС‡РЅС‹Рµ РґРµРЅСЊРіРё',u8'РђРїС‚РµС‡РєРё',
+        u8'Р‘РѕРєСЃ',u8'Kung-Fu',u8'KickBox',u8'РќР°СЂРєРѕР·Р°РІРёСЃРёРјРѕСЃС‚СЊ',u8'РќР°СЂРєРѕС‚РёРєРё'
     },
     prizStatId = {1,2,3,4,5,6,7,8,9,10,12,13,14,15,16},
     combo_priz = imgui.ImInt(0),
     guiLog = {},
     
     mp_names = {
-        u8"Король Дигла",
-        u8"Русская Рулетка",
-        u8"Поливалка",
-        u8"Дерби",
-        u8"Снайпер",
+        u8"РљРѕСЂРѕР»СЊ Р”РёРіР»Р°",
+        u8"Р СѓСЃСЃРєР°СЏ Р СѓР»РµС‚РєР°",
+        u8"РџРѕР»РёРІР°Р»РєР°",
+        u8"Р”РµСЂР±Рё",
+        u8"РЎРЅР°Р№РїРµСЂ",
         u8"Paint-Ball",
-        u8"Бой на Катанах"
+        u8"Р‘РѕР№ РЅР° РљР°С‚Р°РЅР°С…"
     },
     combo_mp_name = imgui.ImInt(0),
     mp_custom_name = imgui.ImBuffer(64),
@@ -1315,7 +1326,7 @@ FHA.state = {
     
     gmCarEnabled = imgui.ImBool(false),
 
-    -- === ZZVEH ПЕРЕМЕННЫЕ ===
+    -- === ZZVEH РџР•Р Р•РњР•РќРќР«Р• ===
     zzvehEnabled = imgui.ImBool(false),
     zzvehId = 0,
     zzvehC1 = 0,
@@ -1324,7 +1335,7 @@ FHA.state = {
     zzvehTime = 0,
     zzvehCar = "",
     zzvehAct = false,
-    -- === КОНЕЦ ZZVEH ===
+    -- === РљРћРќР•Р¦ ZZVEH ===
 
     razdStartTime = 0,
     razdWord = "",
@@ -1720,7 +1731,7 @@ local function GZ_updateCapStatus()
     FHA.state.gz_capAttacker = nil
 end
 
--- ===== ФУНКЦИИ ВИЗУАЛЬНОЙ ПОЧИНКИ МАШИНЫ =====
+-- ===== Р¤РЈРќРљР¦РР Р’РР—РЈРђР›Р¬РќРћР™ РџРћР§РРќРљР РњРђРЁРРќР« =====
 function fixCarDoor(car, door)
     if doesVehicleExist(car) then
         local carPtr = getCarPointer(car)
@@ -1745,7 +1756,7 @@ function fixCarPanel(car, panel)
     end
 end
 
--- ===== GM CAR ПОТОК =====
+-- ===== GM CAR РџРћРўРћРљ =====
 function FHA_gmCarThread()
     local st = FHA.state
     while not FHA.isUnloading do
@@ -1805,7 +1816,7 @@ function FHA_gmCarThread()
     end
 end
 
--- ===== SAMPEV ОБРАБОТЧИКИ =====
+-- ===== SAMPEV РћР‘Р РђР‘РћРўР§РРљР =====
 function sampev.onVehicleDamageStatusUpdate(vehicleid, playerid)
     local st = FHA.state
     if st.gmCarEnabled.v then
@@ -1834,7 +1845,7 @@ function sampev.onShowDialog(id, style, title, button1, button2, text)
     
     if not title then return end
 
-    if st.mpAutoStep == 1 and title:find(u8:decode("Меню мероприятий")) then
+    if st.mpAutoStep == 1 and title:find(u8:decode("РњРµРЅСЋ РјРµСЂРѕРїСЂРёСЏС‚РёР№")) then
         lua_thread.create(function()
             if FHA.isUnloading then return end
             wait(200)
@@ -1844,7 +1855,7 @@ function sampev.onShowDialog(id, style, title, button1, button2, text)
         end)
     end
 
-    if st.otborRunning and title:find(u8:decode("Меню мероприятий")) then
+    if st.otborRunning and title:find(u8:decode("РњРµРЅСЋ РјРµСЂРѕРїСЂРёСЏС‚РёР№")) then
         lua_thread.create(function()
             if FHA.isUnloading then return end
             wait(200)
@@ -1889,42 +1900,42 @@ function sampev.onSendPlayerSync(data)
     end
 end
 
--- ===== ОСНОВНОЙ ОБРАБОТЧИК СООБЩЕНИЙ =====
+-- ===== РћРЎРќРћР’РќРћР™ РћР‘Р РђР‘РћРўР§РРљ РЎРћРћР‘Р©Р•РќРР™ =====
 function sampev.onServerMessage(color, text)
-    -- === ПЕРЕХВАТ /VEH ДЛЯ ZZVEH ===
+    -- === РџР•Р Р•РҐР’РђРў /VEH Р”Р›РЇ ZZVEH ===
     local st = FHA.state
     
-    -- Убираем цветовые коды
+    -- РЈР±РёСЂР°РµРј С†РІРµС‚РѕРІС‹Рµ РєРѕРґС‹
     local rawText = text:gsub("{%x%x%x%x%x%x}", "")
     
-    -- Проверяем команду /veh (3 параметра: id, c1, c2)
+    -- РџСЂРѕРІРµСЂСЏРµРј РєРѕРјР°РЅРґСѓ /veh (3 РїР°СЂР°РјРµС‚СЂР°: id, c1, c2)
     if rawText:find("^/veh%s(%d+)%s(%d+)%s(%d+)") and not st.zzvehAct and st.zzvehEnabled.v and st.adminLevel.v >= 6 then
-        -- Сохраняем параметры как в GrandTools
+        -- РЎРѕС…СЂР°РЅСЏРµРј РїР°СЂР°РјРµС‚СЂС‹ РєР°Рє РІ GrandTools
         st.zzvehId, st.zzvehC1, st.zzvehC2 = rawText:match("^/veh%s(%d+)%s(%d+)%s(%d+)")
         st.zzvehActive = true
         st.zzvehTime = os.time()
         st.zzvehCar = rawText
         
-        -- Запускаем создание
+        -- Р—Р°РїСѓСЃРєР°РµРј СЃРѕР·РґР°РЅРёРµ
         FHA_createCarInZZ()
         
-        -- Не показываем команду в чате
+        -- РќРµ РїРѕРєР°Р·С‹РІР°РµРј РєРѕРјР°РЅРґСѓ РІ С‡Р°С‚Рµ
         return false
     end
     
-    -- Проверяем выход из зоны (как в GrandTools)
-    if rawText:find("Вы покинули зелёную зону") or rawText:find("Вы покинули зону") then
+    -- РџСЂРѕРІРµСЂСЏРµРј РІС‹С…РѕРґ РёР· Р·РѕРЅС‹ (РєР°Рє РІ GrandTools)
+    if rawText:find("Р’С‹ РїРѕРєРёРЅСѓР»Рё Р·РµР»С‘РЅСѓСЋ Р·РѕРЅСѓ") or rawText:find("Р’С‹ РїРѕРєРёРЅСѓР»Рё Р·РѕРЅСѓ") then
         if st.zzvehActive and st.zzvehEnabled.v and st.adminLevel.v >= 6 then
-            -- Если машина ещё не создалась, создаём при выходе
+            -- Р•СЃР»Рё РјР°С€РёРЅР° РµС‰С‘ РЅРµ СЃРѕР·РґР°Р»Р°СЃСЊ, СЃРѕР·РґР°С‘Рј РїСЂРё РІС‹С…РѕРґРµ
             if not st.zzvehAct then
                 FHA_createCarInZZ()
             end
             return false
         end
     end
-    -- === КОНЕЦ ПЕРЕХВАТА ===
+    -- === РљРћРќР•Р¦ РџР•Р Р•РҐР’РђРўРђ ===
     
-    -- Обработка для Admin Render
+    -- РћР±СЂР°Р±РѕС‚РєР° РґР»СЏ Admin Render
     if adminRender.onServerMessage(color, text) then
         return false
     end
@@ -1933,7 +1944,7 @@ function sampev.onServerMessage(color, text)
     local state = FHA.state
     
     if state.autoWish.v then
-        if cleanText:find("БАНКОВСКИЙ ЧЕК") then
+        if cleanText:find("Р‘РђРќРљРћР’РЎРљРР™ Р§Р•Рљ") then
             if not state.paydayTriggered then
                 state.paydayTriggered = true
                 lua_thread.create(function()
@@ -1943,17 +1954,17 @@ function sampev.onServerMessage(color, text)
                     sampSendChat("/gg")
                 end)
             end
-        elseif not cleanText:find("БАНКОВСКИЙ ЧЕК") then
+        elseif not cleanText:find("Р‘РђРќРљРћР’РЎРљРР™ Р§Р•Рљ") then
             state.paydayTriggered = false
         end
     end
 
     local nick, id, msg
     
-    nick, id, msg = cleanText:match("Репорт от (.+)%[(%d+)%]: (.+)")
+    nick, id, msg = cleanText:match("Р РµРїРѕСЂС‚ РѕС‚ (.+)%[(%d+)%]: (.+)")
     
     if not nick then
-        nick, id, msg = cleanText:match("Репорт от (.+) %((%d+)%)%: (.+)")
+        nick, id, msg = cleanText:match("Р РµРїРѕСЂС‚ РѕС‚ (.+) %((%d+)%)%: (.+)")
     end
     
     if not nick then
@@ -1968,16 +1979,16 @@ function sampev.onServerMessage(color, text)
     end
 
     if state.active_razd and not state.active_razd2 and state.text_word.v ~= "" then
-        local _, pid2, msg2 = text:match('Репорт от (.*)%[(%d+)%]: %{FFFFFF%}(.*)')
+        local _, pid2, msg2 = text:match('Р РµРїРѕСЂС‚ РѕС‚ (.*)%[(%d+)%]: %{FFFFFF%}(.*)')
         if msg2 then
             local repWord = msg2:match("^(%S+)")
             if repWord == u8:decode(state.text_word.v) then
                 if sampIsPlayerConnected(tonumber(pid2)) then
                     state.razd_player_id = tonumber(pid2)
                     state.active_razd2 = true
-                    sampAddChatMessage("{33FF33}[FastHelperAdm] Победитель найден! Выдача приза...", -1)
+                    sampAddChatMessage("{33FF33}[FastHelperAdm] РџРѕР±РµРґРёС‚РµР»СЊ РЅР°Р№РґРµРЅ! Р’С‹РґР°С‡Р° РїСЂРёР·Р°...", -1)
                 else
-                    sampAddChatMessage("{FF5555}[FastHelperAdm] Победитель вышел из игры, раздача отменена", -1)
+                    sampAddChatMessage("{FF5555}[FastHelperAdm] РџРѕР±РµРґРёС‚РµР»СЊ РІС‹С€РµР» РёР· РёРіСЂС‹, СЂР°Р·РґР°С‡Р° РѕС‚РјРµРЅРµРЅР°", -1)
                     FHA_resetRazdacha()
                 end
             end
@@ -1985,7 +1996,7 @@ function sampev.onServerMessage(color, text)
     end
 end
 
--- ===== ФУНКЦИИ ДЛЯ РАБОТЫ С ЦВЕТАМИ =====
+-- ===== Р¤РЈРќРљР¦РР Р”Р›РЇ Р РђР‘РћРўР« РЎ Р¦Р’Р•РўРђРњР =====
 function FHA_join_argb(r, g, b, a)
     a = a or 1.0
     local argb = math.floor(b * 255)
@@ -2012,59 +2023,59 @@ end
 
 function FHA_adminWord()
     if FHA.state.gender.v == 1 then
-        return "Администраторши"
+        return "РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂС€Рё"
     else
-        return "Администратора"
+        return "РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°"
     end
 end
 
 FHA.templates = {
     pleasant_game = function()
         return FHA_genderText(
-            "Приятной игры от Администратора <3",
-            "Приятной игры от Администраторши <3"
+            "РџСЂРёСЏС‚РЅРѕР№ РёРіСЂС‹ РѕС‚ РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР° <3",
+            "РџСЂРёСЏС‚РЅРѕР№ РёРіСЂС‹ РѕС‚ РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂС€Рё <3"
         )
     end,
 
     pleasant_game_waiting = function()
         return FHA_genderText(
-            "Ожидайте | Приятной игры от Администратора <3",
-            "Ожидайте | Приятной игры от Администраторши <3"
+            "РћР¶РёРґР°Р№С‚Рµ | РџСЂРёСЏС‚РЅРѕР№ РёРіСЂС‹ РѕС‚ РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР° <3",
+            "РћР¶РёРґР°Р№С‚Рµ | РџСЂРёСЏС‚РЅРѕР№ РёРіСЂС‹ РѕС‚ РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂС€Рё <3"
         )
     end,
 
     clarify = function()
         return FHA_genderEnding(
-            "Уточните ваш вопрос."
+            "РЈС‚РѕС‡РЅРёС‚Рµ РІР°С€ РІРѕРїСЂРѕСЃ."
         )
     end,
 
     helped = function()
         return FHA_genderEnding(
-            "Я помог(ла) вам. " .. FHA.templates.pleasant_game()
+            "РЇ РїРѕРјРѕРі(Р»Р°) РІР°Рј. " .. FHA.templates.pleasant_game()
         )
     end,
 
     waiting = function()
         return FHA_genderEnding(
-            "Ожидайте, я уже проверяю вашу ситуацию."
+            "РћР¶РёРґР°Р№С‚Рµ, СЏ СѓР¶Рµ РїСЂРѕРІРµСЂСЏСЋ РІР°С€Сѓ СЃРёС‚СѓР°С†РёСЋ."
         )
     end,
 
     watching = function()
         return FHA_genderEnding(
-            "Я слежу за вашей ситуацией."
+            "РЇ СЃР»РµР¶Сѓ Р·Р° РІР°С€РµР№ СЃРёС‚СѓР°С†РёРµР№."
         )
     end,
 
     transferred = function()
         return FHA_genderEnding(
-            "Передаю ваш репорт старшей администрации."
+            "РџРµСЂРµРґР°СЋ РІР°С€ СЂРµРїРѕСЂС‚ СЃС‚Р°СЂС€РµР№ Р°РґРјРёРЅРёСЃС‚СЂР°С†РёРё."
         )
     end,
 
     spawn = function()
-        return "Используйте /spawn для решения проблемы."
+        return "РСЃРїРѕР»СЊР·СѓР№С‚Рµ /spawn РґР»СЏ СЂРµС€РµРЅРёСЏ РїСЂРѕР±Р»РµРјС‹."
     end
 }
 
@@ -2279,9 +2290,9 @@ function FHA_saveCfg()
     
     f:write("killListEnabled=" .. (killList.enabled and "1" or "0") .. "\n")
     
-    -- === СОХРАНЕНИЕ ZZVEH ===
+    -- === РЎРћРҐР РђРќР•РќРР• ZZVEH ===
     f:write("zzvehEnabled=" .. (st.zzvehEnabled.v and "1" or "0") .. "\n")
-    -- === КОНЕЦ ZZVEH ===
+    -- === РљРћРќР•Р¦ ZZVEH ===
     
     f:close()
 end
@@ -2367,9 +2378,9 @@ function FHA_loadCfg()
                 end
             end
             
-            -- === ЗАГРУЗКА ZZVEH ===
+            -- === Р—РђР“Р РЈР—РљРђ ZZVEH ===
             if k == "zzvehEnabled" then st.zzvehEnabled.v = toBool(numVal) end
-            -- === КОНЕЦ ZZVEH ===
+            -- === РљРћРќР•Р¦ ZZVEH ===
         end
         
         local k2, v2 = line:match("^(%w+[RGB])=([%d.]+)$")
@@ -2433,7 +2444,7 @@ function FHA_loadCfg()
     st.airbrakeActive = false
 end
 
--- ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ МЕНЮ =====
+-- ===== Р’РЎРџРћРњРћР“РђРўР•Р›Р¬РќР«Р• Р¤РЈРќРљР¦РР Р”Р›РЇ РњР•РќР® =====
 local function U32(col)
     return imgui.ColorConvertFloat4ToU32(col)
 end
@@ -2450,7 +2461,7 @@ local function getMSKTime()
     end
 end
 
--- ===== КИБЕР-МЕНЮ =====
+-- ===== РљРР‘Р•Р -РњР•РќР® =====
 FHA.cyberMenu = FHA.cyberMenu or {
     visible = false,
     gearAngle = 0.0,
@@ -2795,84 +2806,84 @@ local function FHA_SpeedhackThread()
     end
 end
 
--- ===== НАСТРОЙКИ ТРЕЙСЕРА =====
+-- ===== РќРђРЎРўР РћР™РљР РўР Р•Р™РЎР•Р Рђ =====
 local function DrawTracerSettings()
     local st = FHA.state
     
     imgui.BeginChild("##tracer_settings", imgui.ImVec2(0, 0), true, imgui.WindowFlags.VerticalScrollbar)
     
-    imgui.TextColored(cs.accent, u8"=== НАСТРОЙКИ ТРЕЙСЕРА ===")
+    imgui.TextColored(cs.accent, u8"=== РќРђРЎРўР РћР™РљР РўР Р•Р™РЎР•Р Рђ ===")
     imgui.Spacing()
     
-    imgui.TextColored(imgui.ImVec4(1, 1, 0, 1), u8"Мои пули:")
-    if imgui.Checkbox(u8"Отображать свои пули", st.tracerDrawMyBullets) then st.saveSettingsFlag = true end
-    if imgui.Checkbox(u8"Полигон в конце (свои)", st.tracerCbEndMy) then st.saveSettingsFlag = true end
+    imgui.TextColored(imgui.ImVec4(1, 1, 0, 1), u8"РњРѕРё РїСѓР»Рё:")
+    if imgui.Checkbox(u8"РћС‚РѕР±СЂР°Р¶Р°С‚СЊ СЃРІРѕРё РїСѓР»Рё", st.tracerDrawMyBullets) then st.saveSettingsFlag = true end
+    if imgui.Checkbox(u8"РџРѕР»РёРіРѕРЅ РІ РєРѕРЅС†Рµ (СЃРІРѕРё)", st.tracerCbEndMy) then st.saveSettingsFlag = true end
     
-    imgui.SliderInt(u8"Время отображения (свои)", st.tracerTimeRenderMyBullets, 1, 60)
-    imgui.SliderInt(u8"Толщина линии (свои)", st.tracerSizeOffMyLine, 1, 10)
-    imgui.SliderInt(u8"Размер полигона (свои)", st.tracerSizeOffMyPolygonEnd, 1, 20)
-    imgui.SliderInt(u8"Вращение полигона (свои)", st.tracerRotationMyPolygonEnd, 1, 360)
-    imgui.SliderInt(u8"Угол полигона (свои)", st.tracerDegreeMyPolygonEnd, 3, 360)
-    imgui.SliderInt(u8"Лимит линий (свои)", st.tracerMaxLineMyLimit, 1, 100)
+    imgui.SliderInt(u8"Р’СЂРµРјСЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ (СЃРІРѕРё)", st.tracerTimeRenderMyBullets, 1, 60)
+    imgui.SliderInt(u8"РўРѕР»С‰РёРЅР° Р»РёРЅРёРё (СЃРІРѕРё)", st.tracerSizeOffMyLine, 1, 10)
+    imgui.SliderInt(u8"Р Р°Р·РјРµСЂ РїРѕР»РёРіРѕРЅР° (СЃРІРѕРё)", st.tracerSizeOffMyPolygonEnd, 1, 20)
+    imgui.SliderInt(u8"Р’СЂР°С‰РµРЅРёРµ РїРѕР»РёРіРѕРЅР° (СЃРІРѕРё)", st.tracerRotationMyPolygonEnd, 1, 360)
+    imgui.SliderInt(u8"РЈРіРѕР» РїРѕР»РёРіРѕРЅР° (СЃРІРѕРё)", st.tracerDegreeMyPolygonEnd, 3, 360)
+    imgui.SliderInt(u8"Р›РёРјРёС‚ Р»РёРЅРёР№ (СЃРІРѕРё)", st.tracerMaxLineMyLimit, 1, 100)
     
-    imgui.ColorEdit4(u8"Статик. объект (свои)", st.tracerStaticObjectMy)
-    imgui.ColorEdit4(u8"Динамик. объект (свои)", st.tracerDinamicObjectMy)
-    imgui.ColorEdit4(u8"Игрок (свои)", st.tracerPedPMy)
-    imgui.ColorEdit4(u8"Машина (свои)", st.tracerCarPMy)
+    imgui.ColorEdit4(u8"РЎС‚Р°С‚РёРє. РѕР±СЉРµРєС‚ (СЃРІРѕРё)", st.tracerStaticObjectMy)
+    imgui.ColorEdit4(u8"Р”РёРЅР°РјРёРє. РѕР±СЉРµРєС‚ (СЃРІРѕРё)", st.tracerDinamicObjectMy)
+    imgui.ColorEdit4(u8"РРіСЂРѕРє (СЃРІРѕРё)", st.tracerPedPMy)
+    imgui.ColorEdit4(u8"РњР°С€РёРЅР° (СЃРІРѕРё)", st.tracerCarPMy)
     
     imgui.Separator()
     imgui.Spacing()
     
-    imgui.TextColored(imgui.ImVec4(1, 1, 0, 1), u8"Чужие пули:")
-    if imgui.Checkbox(u8"Отображать чужие пули", st.tracerDrawBullets) then st.saveSettingsFlag = true end
-    if imgui.Checkbox(u8"Полигон в конце (чужие)", st.tracerCbEnd) then st.saveSettingsFlag = true end
-    if imgui.Checkbox(u8"Информация об игроке", st.tracerShowPlayerInfo) then st.saveSettingsFlag = true end
+    imgui.TextColored(imgui.ImVec4(1, 1, 0, 1), u8"Р§СѓР¶РёРµ РїСѓР»Рё:")
+    if imgui.Checkbox(u8"РћС‚РѕР±СЂР°Р¶Р°С‚СЊ С‡СѓР¶РёРµ РїСѓР»Рё", st.tracerDrawBullets) then st.saveSettingsFlag = true end
+    if imgui.Checkbox(u8"РџРѕР»РёРіРѕРЅ РІ РєРѕРЅС†Рµ (С‡СѓР¶РёРµ)", st.tracerCbEnd) then st.saveSettingsFlag = true end
+    if imgui.Checkbox(u8"РРЅС„РѕСЂРјР°С†РёСЏ РѕР± РёРіСЂРѕРєРµ", st.tracerShowPlayerInfo) then st.saveSettingsFlag = true end
     
     if st.tracerShowPlayerInfo.v then
-        if imgui.Checkbox(u8"Только ID", st.tracerOnlyId) then st.saveSettingsFlag = true end
+        if imgui.Checkbox(u8"РўРѕР»СЊРєРѕ ID", st.tracerOnlyId) then st.saveSettingsFlag = true end
         imgui.SameLine()
-        if imgui.Checkbox(u8"Только Ник", st.tracerOnlyNick) then st.saveSettingsFlag = true end
+        if imgui.Checkbox(u8"РўРѕР»СЊРєРѕ РќРёРє", st.tracerOnlyNick) then st.saveSettingsFlag = true end
     end
     
-    imgui.SliderInt(u8"Время отображения (чужие)", st.tracerTimeRenderBullets, 1, 60)
-    imgui.SliderInt(u8"Толщина линии (чужие)", st.tracerSizeOffLine, 1, 10)
-    imgui.SliderInt(u8"Размер полигона (чужие)", st.tracerSizeOffPolygonEnd, 1, 20)
-    imgui.SliderInt(u8"Вращение полигона (чужие)", st.tracerRotationPolygonEnd, 1, 360)
-    imgui.SliderInt(u8"Угол полигона (чужие)", st.tracerDegreePolygonEnd, 3, 360)
-    imgui.SliderInt(u8"Лимит линий (чужие)", st.tracerMaxLineLimit, 1, 100)
+    imgui.SliderInt(u8"Р’СЂРµРјСЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ (С‡СѓР¶РёРµ)", st.tracerTimeRenderBullets, 1, 60)
+    imgui.SliderInt(u8"РўРѕР»С‰РёРЅР° Р»РёРЅРёРё (С‡СѓР¶РёРµ)", st.tracerSizeOffLine, 1, 10)
+    imgui.SliderInt(u8"Р Р°Р·РјРµСЂ РїРѕР»РёРіРѕРЅР° (С‡СѓР¶РёРµ)", st.tracerSizeOffPolygonEnd, 1, 20)
+    imgui.SliderInt(u8"Р’СЂР°С‰РµРЅРёРµ РїРѕР»РёРіРѕРЅР° (С‡СѓР¶РёРµ)", st.tracerRotationPolygonEnd, 1, 360)
+    imgui.SliderInt(u8"РЈРіРѕР» РїРѕР»РёРіРѕРЅР° (С‡СѓР¶РёРµ)", st.tracerDegreePolygonEnd, 3, 360)
+    imgui.SliderInt(u8"Р›РёРјРёС‚ Р»РёРЅРёР№ (С‡СѓР¶РёРµ)", st.tracerMaxLineLimit, 1, 100)
     
-    imgui.ColorEdit4(u8"Статик. объект (чужие)", st.tracerStaticObject)
-    imgui.ColorEdit4(u8"Динамик. объект (чужие)", st.tracerDinamicObject)
-    imgui.ColorEdit4(u8"Игрок (чужие)", st.tracerPedP)
-    imgui.ColorEdit4(u8"Машина (чужие)", st.tracerCarP)
-    imgui.ColorEdit4(u8"Цвет инфо игрока", st.tracerColorPlayerI)
+    imgui.ColorEdit4(u8"РЎС‚Р°С‚РёРє. РѕР±СЉРµРєС‚ (С‡СѓР¶РёРµ)", st.tracerStaticObject)
+    imgui.ColorEdit4(u8"Р”РёРЅР°РјРёРє. РѕР±СЉРµРєС‚ (С‡СѓР¶РёРµ)", st.tracerDinamicObject)
+    imgui.ColorEdit4(u8"РРіСЂРѕРє (С‡СѓР¶РёРµ)", st.tracerPedP)
+    imgui.ColorEdit4(u8"РњР°С€РёРЅР° (С‡СѓР¶РёРµ)", st.tracerCarP)
+    imgui.ColorEdit4(u8"Р¦РІРµС‚ РёРЅС„Рѕ РёРіСЂРѕРєР°", st.tracerColorPlayerI)
     
     imgui.Separator()
     imgui.Spacing()
     
-    if imgui.Button(u8"Сохранить настройки", imgui.ImVec2(-1, 30)) then
+    if imgui.Button(u8"РЎРѕС…СЂР°РЅРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєРё", imgui.ImVec2(-1, 30)) then
         FHA_saveCfg()
-        sampAddChatMessage("{33FF33}[FastHelperAdm] Настройки Tracer сохранены!", -1)
+        sampAddChatMessage("{33FF33}[FastHelperAdm] РќР°СЃС‚СЂРѕР№РєРё Tracer СЃРѕС…СЂР°РЅРµРЅС‹!", -1)
     end
     
     imgui.EndChild()
 end
 
--- ===== ВКЛАДКИ МЕНЮ =====
+-- ===== Р’РљР›РђР”РљР РњР•РќР® =====
 local function DrawTab1_Cyber()
-    imgui.TextColored(cs.accent, u8">>> ОСНОВНЫЕ КОМАНДЫ <<<")
+    imgui.TextColored(cs.accent, u8">>> РћРЎРќРћР’РќР«Р• РљРћРњРђРќР”Р« <<<")
     imgui.Spacing()
     imgui.TextWrapped(FHA_genderText(
-        u8"Основные команды:\n/plmenu – открыть/закрыть меню\n/pl [id] [код/текст]\n/lc - Открыть/закрыть вкладку Временное Лидерство\n/invis - Для использования невидимости",
-        u8"Основные команды:\n/plmenu – открыть/закрыть меню\n/pl [id] [код/текст]\n/lc - Открыть/закрыть вкладку Временное Лидерство\n/invis - Для использования невидимости"
+        u8"РћСЃРЅРѕРІРЅС‹Рµ РєРѕРјР°РЅРґС‹:\n/plmenu вЂ“ РѕС‚РєСЂС‹С‚СЊ/Р·Р°РєСЂС‹С‚СЊ РјРµРЅСЋ\n/pl [id] [РєРѕРґ/С‚РµРєСЃС‚]\n/lc - РћС‚РєСЂС‹С‚СЊ/Р·Р°РєСЂС‹С‚СЊ РІРєР»Р°РґРєСѓ Р’СЂРµРјРµРЅРЅРѕРµ Р›РёРґРµСЂСЃС‚РІРѕ\n/invis - Р”Р»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РЅРµРІРёРґРёРјРѕСЃС‚Рё",
+        u8"РћСЃРЅРѕРІРЅС‹Рµ РєРѕРјР°РЅРґС‹:\n/plmenu вЂ“ РѕС‚РєСЂС‹С‚СЊ/Р·Р°РєСЂС‹С‚СЊ РјРµРЅСЋ\n/pl [id] [РєРѕРґ/С‚РµРєСЃС‚]\n/lc - РћС‚РєСЂС‹С‚СЊ/Р·Р°РєСЂС‹С‚СЊ РІРєР»Р°РґРєСѓ Р’СЂРµРјРµРЅРЅРѕРµ Р›РёРґРµСЂСЃС‚РІРѕ\n/invis - Р”Р»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РЅРµРІРёРґРёРјРѕСЃС‚Рё"
     ))
     imgui.TextWrapped(FHA_genderText(
-        u8"Быстрые коды:\no – Ожидайте\ny – Уточните\ngo – Уже иду\nhel – Помог\nsg – Свободная группа\nnon – Нет в сети\nper – Передам\notk – Отказ\nrp – РП путём\ns – Слежу",
-        u8"Быстрые коды:\no – Ожидайте\ny – Уточните\ngo – Уже иду\nhel – Помогла\nsg – Свободная группа\nnon – Нет в сети\nper – Передам\notk – Отказ\nrp – РП путём\ns – Слежу"
+        u8"Р‘С‹СЃС‚СЂС‹Рµ РєРѕРґС‹:\no вЂ“ РћР¶РёРґР°Р№С‚Рµ\ny вЂ“ РЈС‚РѕС‡РЅРёС‚Рµ\ngo вЂ“ РЈР¶Рµ РёРґСѓ\nhel вЂ“ РџРѕРјРѕРі\nsg вЂ“ РЎРІРѕР±РѕРґРЅР°СЏ РіСЂСѓРїРїР°\nnon вЂ“ РќРµС‚ РІ СЃРµС‚Рё\nper вЂ“ РџРµСЂРµРґР°Рј\notk вЂ“ РћС‚РєР°Р·\nrp вЂ“ Р Рџ РїСѓС‚С‘Рј\ns вЂ“ РЎР»РµР¶Сѓ",
+        u8"Р‘С‹СЃС‚СЂС‹Рµ РєРѕРґС‹:\no вЂ“ РћР¶РёРґР°Р№С‚Рµ\ny вЂ“ РЈС‚РѕС‡РЅРёС‚Рµ\ngo вЂ“ РЈР¶Рµ РёРґСѓ\nhel вЂ“ РџРѕРјРѕРіР»Р°\nsg вЂ“ РЎРІРѕР±РѕРґРЅР°СЏ РіСЂСѓРїРїР°\nnon вЂ“ РќРµС‚ РІ СЃРµС‚Рё\nper вЂ“ РџРµСЂРµРґР°Рј\notk вЂ“ РћС‚РєР°Р·\nrp вЂ“ Р Рџ РїСѓС‚С‘Рј\ns вЂ“ РЎР»РµР¶Сѓ"
     ))
     imgui.TextWrapped(FHA_genderText(
-        u8"Примеры:\n/pl 15 o\n/pl 15 Привет",
-        u8"Примеры:\n/pl 15 o\n/pl 15 Привет"
+        u8"РџСЂРёРјРµСЂС‹:\n/pl 15 o\n/pl 15 РџСЂРёРІРµС‚",
+        u8"РџСЂРёРјРµСЂС‹:\n/pl 15 o\n/pl 15 РџСЂРёРІРµС‚"
     ))
 end
 
@@ -2880,54 +2891,54 @@ local function DrawTab2_Cyber()
     local st = FHA.state
     local al = FHA.autoLogin
     
-    imgui.TextColored(cs.accent, u8">>> НАСТРОЙКИ <<<")
+    imgui.TextColored(cs.accent, u8">>> РќРђРЎРўР РћР™РљР <<<")
     imgui.Spacing()
     
-    imgui.Text(u8"Основные настройки")
+    imgui.Text(u8"РћСЃРЅРѕРІРЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё")
     imgui.Separator()
     
-    imgui.Text(u8"Цвет меню")
+    imgui.Text(u8"Р¦РІРµС‚ РјРµРЅСЋ")
     local colorChoices = {
-        u8"Красный", 
-        u8"Зеленый", 
-        u8"Синий", 
-        u8"Оранжевый", 
-        u8"Желтый", 
-        u8"Голубой", 
-        u8"Фиолетовый",
-        u8"Радужный"
+        u8"РљСЂР°СЃРЅС‹Р№", 
+        u8"Р—РµР»РµРЅС‹Р№", 
+        u8"РЎРёРЅРёР№", 
+        u8"РћСЂР°РЅР¶РµРІС‹Р№", 
+        u8"Р–РµР»С‚С‹Р№", 
+        u8"Р“РѕР»СѓР±РѕР№", 
+        u8"Р¤РёРѕР»РµС‚РѕРІС‹Р№",
+        u8"Р Р°РґСѓР¶РЅС‹Р№"
     }
-    if imgui.Combo(u8"Выберите цвет", st.menuColor, colorChoices, #colorChoices) then
+    if imgui.Combo(u8"Р’С‹Р±РµСЂРёС‚Рµ С†РІРµС‚", st.menuColor, colorChoices, #colorChoices) then
         UpdateCyberColors()
         st.saveSettingsFlag = true
     end
 
     if st.menuColor.v == 7 then
-        imgui.TextColored(imgui.ImVec4(1,0,1,1), u8"? Радужный режим активен")
+        imgui.TextColored(imgui.ImVec4(1,0,1,1), u8"? Р Р°РґСѓР¶РЅС‹Р№ СЂРµР¶РёРј Р°РєС‚РёРІРµРЅ")
     end
 
     imgui.Spacing()
-    imgui.Text(FHA_genderText(u8"Пол администратора", u8"Пол администраторши"))
-    imgui.RadioButton(u8"Мужской", st.gender, 0)
+    imgui.Text(FHA_genderText(u8"РџРѕР» Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°", u8"РџРѕР» Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂС€Рё"))
+    imgui.RadioButton(u8"РњСѓР¶СЃРєРѕР№", st.gender, 0)
     imgui.SameLine()
-    imgui.RadioButton(u8"Женский", st.gender, 1)
+    imgui.RadioButton(u8"Р–РµРЅСЃРєРёР№", st.gender, 1)
 
     imgui.Spacing()
-    imgui.Text(u8"Уровень админ прав")
-    imgui.SliderInt(u8"Выберите уровень", st.adminLevel, 1, 14)
+    imgui.Text(u8"РЈСЂРѕРІРµРЅСЊ Р°РґРјРёРЅ РїСЂР°РІ")
+    imgui.SliderInt(u8"Р’С‹Р±РµСЂРёС‚Рµ СѓСЂРѕРІРµРЅСЊ", st.adminLevel, 1, 14)
 
     imgui.Spacing()
     imgui.Separator()
     imgui.Spacing()
     
-    imgui.TextColored(imgui.ImVec4(1, 0.8, 0.2, 1), u8"[#] Автоматический вход в админку")
+    imgui.TextColored(imgui.ImVec4(1, 0.8, 0.2, 1), u8"[#] РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРёР№ РІС…РѕРґ РІ Р°РґРјРёРЅРєСѓ")
     
     if st.adminLevel.v >= 6 then
-        if imgui.Checkbox(u8"Включить авто-логин", al.enabled) then
+        if imgui.Checkbox(u8"Р’РєР»СЋС‡РёС‚СЊ Р°РІС‚Рѕ-Р»РѕРіРёРЅ", al.enabled) then
             FHA_saveCfg()
         end
     else
-        imgui.TextColored(imgui.ImVec4(0.7, 0.7, 0.7, 1), u8"Включить авто-логин (требуется уровень 6+)")
+        imgui.TextColored(imgui.ImVec4(0.7, 0.7, 0.7, 1), u8"Р’РєР»СЋС‡РёС‚СЊ Р°РІС‚Рѕ-Р»РѕРіРёРЅ (С‚СЂРµР±СѓРµС‚СЃСЏ СѓСЂРѕРІРµРЅСЊ 6+)")
         if al.enabled.v then
             al.enabled.v = false
             FHA_saveCfg()
@@ -2936,7 +2947,7 @@ local function DrawTab2_Cyber()
     
     if al.enabled.v or st.adminLevel.v >= 6 then
         imgui.Spacing()
-        imgui.Text(u8"Пароль от админки:")
+        imgui.Text(u8"РџР°СЂРѕР»СЊ РѕС‚ Р°РґРјРёРЅРєРё:")
         
         local buttonWidth = 40
         local inputWidth = 200
@@ -2962,9 +2973,9 @@ local function DrawTab2_Cyber()
         
         if imgui.IsItemHovered() then
             if al.showPassword.v then
-                imgui.SetTooltip(u8("Скрыть пароль"))
+                imgui.SetTooltip(u8("РЎРєСЂС‹С‚СЊ РїР°СЂРѕР»СЊ"))
             else
-                imgui.SetTooltip(u8("Показать пароль"))
+                imgui.SetTooltip(u8("РџРѕРєР°Р·Р°С‚СЊ РїР°СЂРѕР»СЊ"))
             end
         end
     end
@@ -2974,23 +2985,23 @@ local function DrawTab2_Cyber()
     imgui.Spacing()
     
     if st.adminLevel.v >= 9 then
-        imgui.TextColored(imgui.ImVec4(0,1,0,1), u8"Доступ ко всем вкладкам доступен")
+        imgui.TextColored(imgui.ImVec4(0,1,0,1), u8"Р”РѕСЃС‚СѓРї РєРѕ РІСЃРµРј РІРєР»Р°РґРєР°Рј РґРѕСЃС‚СѓРїРµРЅ")
     else
-        imgui.TextColored(imgui.ImVec4(1,0.5,0,1), u8"Доступ ограничен. Уровни 1-8 не могут использовать:")
-        imgui.Text(u8"• Авто-Мероприятие")
-        imgui.Text(u8"• Авто-Раздачу") 
-        imgui.Text(u8"• Авто-Отбор")
-        imgui.Text(u8"• Временное лидерство")
+        imgui.TextColored(imgui.ImVec4(1,0.5,0,1), u8"Р”РѕСЃС‚СѓРї РѕРіСЂР°РЅРёС‡РµРЅ. РЈСЂРѕРІРЅРё 1-8 РЅРµ РјРѕРіСѓС‚ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ:")
+        imgui.Text(u8"вЂў РђРІС‚Рѕ-РњРµСЂРѕРїСЂРёСЏС‚РёРµ")
+        imgui.Text(u8"вЂў РђРІС‚Рѕ-Р Р°Р·РґР°С‡Сѓ") 
+        imgui.Text(u8"вЂў РђРІС‚Рѕ-РћС‚Р±РѕСЂ")
+        imgui.Text(u8"вЂў Р’СЂРµРјРµРЅРЅРѕРµ Р»РёРґРµСЂСЃС‚РІРѕ")
     end
 end
 
 local function DrawTab3_Cyber()
-    imgui.TextColored(cs.accent, u8">>> ОТВЕТЫ НА РЕПОРТЫ <<<")
+    imgui.TextColored(cs.accent, u8">>> РћРўР’Р•РўР« РќРђ Р Р•РџРћР РўР« <<<")
     imgui.Spacing()
 
-    imgui.Text(u8"Активные репорты: " .. #FHA.reports)
+    imgui.Text(u8"РђРєС‚РёРІРЅС‹Рµ СЂРµРїРѕСЂС‚С‹: " .. #FHA.reports)
     imgui.SameLine()
-    if imgui.Button(u8"Очистить все") then
+    if imgui.Button(u8"РћС‡РёСЃС‚РёС‚СЊ РІСЃРµ") then
         FHA_clearAllReports()
     end
 
@@ -2998,7 +3009,7 @@ local function DrawTab3_Cyber()
 
     imgui.BeginChild("reports_list", imgui.ImVec2(0, 150), true)
     if #FHA.reports == 0 then
-        imgui.TextColored(imgui.ImVec4(0.7, 0.7, 0.7, 1), u8"Нет активных репортов")
+        imgui.TextColored(imgui.ImVec4(0.7, 0.7, 0.7, 1), u8"РќРµС‚ Р°РєС‚РёРІРЅС‹С… СЂРµРїРѕСЂС‚РѕРІ")
     else
         for i, r in ipairs(FHA.reports) do
             local passed = os.time() - r.time
@@ -3020,11 +3031,11 @@ local function DrawTab3_Cyber()
 
     if FHA.selectedReport then
         local r = FHA.reports[FHA.selectedReport]
-        imgui.TextColored(cs.accent, u8"Выбранный репорт:")
+        imgui.TextColored(cs.accent, u8"Р’С‹Р±СЂР°РЅРЅС‹Р№ СЂРµРїРѕСЂС‚:")
         imgui.TextWrapped(string.format("%s [%d]: %s", r.nick, r.id, r.text))
         imgui.Spacing()
     else
-        imgui.TextColored(imgui.ImVec4(0.7, 0.7, 0.7, 1), u8"Выберите репорт из списка выше.")
+        imgui.TextColored(imgui.ImVec4(0.7, 0.7, 0.7, 1), u8"Р’С‹Р±РµСЂРёС‚Рµ СЂРµРїРѕСЂС‚ РёР· СЃРїРёСЃРєР° РІС‹С€Рµ.")
         imgui.Spacing()
     end
 
@@ -3033,86 +3044,86 @@ local function DrawTab3_Cyber()
     if FHA.selectedReport then
         local r = FHA.reports[FHA.selectedReport]
 
-        imgui.Text(u8"Ответ игроку:")
+        imgui.Text(u8"РћС‚РІРµС‚ РёРіСЂРѕРєСѓ:")
         
         local inputHeight = 70
         if imgui.InputTextMultiline("##answer", FHA.answerText, 
             imgui.ImVec2(-1, inputHeight), imgui.InputTextFlags.None) then
         end
 
-        if imgui.Button(u8"Закрыть репорт", imgui.ImVec2(-1, 35)) then
+        if imgui.Button(u8"Р—Р°РєСЂС‹С‚СЊ СЂРµРїРѕСЂС‚", imgui.ImVec2(-1, 35)) then
             FHA_removeReport(FHA.selectedReport)
         end
 
         imgui.Spacing()
 
-        if imgui.Button(u8"Отправить ответ", imgui.ImVec2(-1, 30)) then
+        if imgui.Button(u8"РћС‚РїСЂР°РІРёС‚СЊ РѕС‚РІРµС‚", imgui.ImVec2(-1, 30)) then
             if #FHA.answerText.v > 0 then
                 local answerCp1251 = encoding.UTF8:decode(FHA.answerText.v)
                 sampSendChat(string.format("/pm %d %s", r.id, answerCp1251))
                 FHA_removeReport(FHA.selectedReport)
             else
-                sampAddChatMessage("{FF4444}[FastHelperAdm] Введите текст ответа", -1)
+                sampAddChatMessage("{FF4444}[FastHelperAdm] Р’РІРµРґРёС‚Рµ С‚РµРєСЃС‚ РѕС‚РІРµС‚Р°", -1)
             end
         end
 
         imgui.Spacing()
         imgui.Separator()
-        imgui.Text(u8"Быстрые действия:")
+        imgui.Text(u8"Р‘С‹СЃС‚СЂС‹Рµ РґРµР№СЃС‚РІРёСЏ:")
         
         imgui.BeginChild("##quick_actions", imgui.ImVec2(0, 150), true)
         local buttonWidth = imgui.GetContentRegionAvail().x - 5
         
-        if imgui.Button(u8"Приятной Игры", imgui.ImVec2(buttonWidth, 28)) then
-            sampSendChat(string.format("/pm %d Приятной игры от %s <3", r.id, FHA_adminWord()))
+        if imgui.Button(u8"РџСЂРёСЏС‚РЅРѕР№ РРіСЂС‹", imgui.ImVec2(buttonWidth, 28)) then
+            sampSendChat(string.format("/pm %d РџСЂРёСЏС‚РЅРѕР№ РёРіСЂС‹ РѕС‚ %s <3", r.id, FHA_adminWord()))
             FHA_removeReport(FHA.selectedReport)
         end
         
-        if imgui.Button(u8"Спавн", imgui.ImVec2(buttonWidth, 28)) then
+        if imgui.Button(u8"РЎРїР°РІРЅ", imgui.ImVec2(buttonWidth, 28)) then
             FHA_sendWithDelay(
                 "/sp " .. r.id,
-                string.format("/pm %d Вы успешно заспавнены | Приятной игры от %s <3", r.id, FHA_adminWord()),
+                string.format("/pm %d Р’С‹ СѓСЃРїРµС€РЅРѕ Р·Р°СЃРїР°РІРЅРµРЅС‹ | РџСЂРёСЏС‚РЅРѕР№ РёРіСЂС‹ РѕС‚ %s <3", r.id, FHA_adminWord()),
                 950
             )
             FHA_removeReport(FHA.selectedReport)
         end
         
-        if imgui.Button(u8"Ожидайте", imgui.ImVec2(buttonWidth, 28)) then
-            sampSendChat(string.format("/pm %d Ожидайте | Приятной игры от %s <3", r.id, FHA_adminWord()))
+        if imgui.Button(u8"РћР¶РёРґР°Р№С‚Рµ", imgui.ImVec2(buttonWidth, 28)) then
+            sampSendChat(string.format("/pm %d РћР¶РёРґР°Р№С‚Рµ | РџСЂРёСЏС‚РЅРѕР№ РёРіСЂС‹ РѕС‚ %s <3", r.id, FHA_adminWord()))
             FHA_removeReport(FHA.selectedReport)
         end
         
-        if imgui.Button(u8"Передать", imgui.ImVec2(buttonWidth, 28)) then
+        if imgui.Button(u8"РџРµСЂРµРґР°С‚СЊ", imgui.ImVec2(buttonWidth, 28)) then
             FHA_sendWithDelay(
-                string.format("/a Репорт от %s[%d] <<%s>>", r.nick, r.id, encoding.UTF8:decode(r.text)),
-                string.format("/pm %d Репорт был передан | Приятной игры от %s <3", r.id, FHA_adminWord()),
+                string.format("/a Р РµРїРѕСЂС‚ РѕС‚ %s[%d] <<%s>>", r.nick, r.id, encoding.UTF8:decode(r.text)),
+                string.format("/pm %d Р РµРїРѕСЂС‚ Р±С‹Р» РїРµСЂРµРґР°РЅ | РџСЂРёСЏС‚РЅРѕР№ РёРіСЂС‹ РѕС‚ %s <3", r.id, FHA_adminWord()),
                 950
             )
             FHA_removeReport(FHA.selectedReport)
         end
         
-        if imgui.Button(u8"СГ", imgui.ImVec2(buttonWidth, 28)) then
-            sampSendChat(string.format("/pm %d Оставьте жалобу в Свободной Группе ВК @inferno_sv", r.id))
+        if imgui.Button(u8"РЎР“", imgui.ImVec2(buttonWidth, 28)) then
+            sampSendChat(string.format("/pm %d РћСЃС‚Р°РІСЊС‚Рµ Р¶Р°Р»РѕР±Сѓ РІ РЎРІРѕР±РѕРґРЅРѕР№ Р“СЂСѓРїРїРµ Р’Рљ @inferno_sv", r.id))
             FHA_removeReport(FHA.selectedReport)
         end
         imgui.EndChild()
     else
-        imgui.TextColored(imgui.ImVec4(0.7, 0.7, 0.7, 1), u8"Выберите репорт для отображения действий.")
+        imgui.TextColored(imgui.ImVec4(0.7, 0.7, 0.7, 1), u8"Р’С‹Р±РµСЂРёС‚Рµ СЂРµРїРѕСЂС‚ РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РґРµР№СЃС‚РІРёР№.")
     end
 end
 
--- ===== ВКЛАДКА 4: ФУНКЦИИ =====
+-- ===== Р’РљР›РђР”РљРђ 4: Р¤РЈРќРљР¦РР =====
 local function DrawTab4_Cyber()
     local st = FHA.state
     
-    imgui.TextColored(cs.accent, u8">>> ПОЛЕЗНЫЕ ФУНКЦИИ <<<")
+    imgui.TextColored(cs.accent, u8">>> РџРћР›Р•Р—РќР«Р• Р¤РЈРќРљР¦РР <<<")
     imgui.Spacing()
     
-    if imgui.Checkbox(u8"Авто Пожелание", st.autoWish) then st.saveSettingsFlag = true end
+    if imgui.Checkbox(u8"РђРІС‚Рѕ РџРѕР¶РµР»Р°РЅРёРµ", st.autoWish) then st.saveSettingsFlag = true end
     imgui.SameLine()
     if imgui.Button(u8" ? ") then end
     if imgui.IsItemHovered() then
-        imgui.SetTooltip(u8"При появлении PayDay будет отправлен /gg")
+        imgui.SetTooltip(u8"РџСЂРё РїРѕСЏРІР»РµРЅРёРё PayDay Р±СѓРґРµС‚ РѕС‚РїСЂР°РІР»РµРЅ /gg")
     end
     
     imgui.Text(u8"Speedhack")
@@ -3121,13 +3132,13 @@ local function DrawTab4_Cyber()
             st.saveSettingsFlag = true 
         end
         imgui.SameLine()
-        imgui.TextDisabled(u8"(Админ 6+)")
+        imgui.TextDisabled(u8"(РђРґРјРёРЅ 6+)")
         if st.speedhackEnabled.v then
-            imgui.Text(u8"Клавиша:")
+            imgui.Text(u8"РљР»Р°РІРёС€Р°:")
             imgui.SameLine()
             if imgui.Button(tostring(st.speedhackKey.v) .. "") then
                 speedhackListening = true
-                sampAddChatMessage("{FFCC00}[Speedhack] Нажмите любую клавишу для смены бинда...", -1)
+                sampAddChatMessage("{FFCC00}[Speedhack] РќР°Р¶РјРёС‚Рµ Р»СЋР±СѓСЋ РєР»Р°РІРёС€Сѓ РґР»СЏ СЃРјРµРЅС‹ Р±РёРЅРґР°...", -1)
             end
             if speedhackListening then
                 for vk = 0, 255 do
@@ -3137,7 +3148,7 @@ local function DrawTab4_Cyber()
                             st.speedhackKey.v = keyName
                             speedhackListening = false
                             st.saveSettingsFlag = true
-                            sampAddChatMessage(string.format("{33FF33}[Speedhack] Бинд изменён на: %s", keyName), -1)
+                            sampAddChatMessage(string.format("{33FF33}[Speedhack] Р‘РёРЅРґ РёР·РјРµРЅС‘РЅ РЅР°: %s", keyName), -1)
                             break
                         end
                     end
@@ -3145,13 +3156,13 @@ local function DrawTab4_Cyber()
             end
         end
     else
-        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"Speedhack (Админ 6+)")
+        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"Speedhack (РђРґРјРёРЅ 6+)")
     end
     
     imgui.Text(u8"Tracer")
-    if imgui.Checkbox(u8"Включить Tracer", st.tracerEnabled) then st.saveSettingsFlag = true end
+    if imgui.Checkbox(u8"Р’РєР»СЋС‡РёС‚СЊ Tracer", st.tracerEnabled) then st.saveSettingsFlag = true end
     imgui.SameLine()
-    if imgui.Button(u8"Настроить Трейсер") then
+    if imgui.Button(u8"РќР°СЃС‚СЂРѕРёС‚СЊ РўСЂРµР№СЃРµСЂ") then
         st.showTracerSettings.v = not st.showTracerSettings.v
     end
     
@@ -3163,38 +3174,38 @@ local function DrawTab4_Cyber()
     
     imgui.Text(u8"ClickWarp")
     if st.adminLevel.v >= 6 then
-        if imgui.Checkbox(u8"ClickWarp (телепорт на колесо)", st.clickWarpEnabled) then st.saveSettingsFlag = true end
+        if imgui.Checkbox(u8"ClickWarp (С‚РµР»РµРїРѕСЂС‚ РЅР° РєРѕР»РµСЃРѕ)", st.clickWarpEnabled) then st.saveSettingsFlag = true end
         imgui.SameLine()
-        imgui.TextDisabled(u8"(Админ 6+)")
+        imgui.TextDisabled(u8"(РђРґРјРёРЅ 6+)")
         
         if st.clickWarpEnabled.v then
-            imgui.TextColored(imgui.ImVec4(0,1,0,1), u8"Управление:")
-            imgui.Text(u8"• Колесо мыши - включить/выключить режим")
-            imgui.Text(u8"• ЛКМ - телепорт к точке")
-            imgui.Text(u8"• ПКМ + ЛКМ - телепорт в машину")
+            imgui.TextColored(imgui.ImVec4(0,1,0,1), u8"РЈРїСЂР°РІР»РµРЅРёРµ:")
+            imgui.Text(u8"вЂў РљРѕР»РµСЃРѕ РјС‹С€Рё - РІРєР»СЋС‡РёС‚СЊ/РІС‹РєР»СЋС‡РёС‚СЊ СЂРµР¶РёРј")
+            imgui.Text(u8"вЂў Р›РљРњ - С‚РµР»РµРїРѕСЂС‚ Рє С‚РѕС‡РєРµ")
+            imgui.Text(u8"вЂў РџРљРњ + Р›РљРњ - С‚РµР»РµРїРѕСЂС‚ РІ РјР°С€РёРЅСѓ")
         end
     else
-        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"ClickWarp [уровень 6+]")
+        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"ClickWarp [СѓСЂРѕРІРµРЅСЊ 6+]")
     end
     
-    imgui.Text(u8"Невидимость")
+    imgui.Text(u8"РќРµРІРёРґРёРјРѕСЃС‚СЊ")
     if st.adminLevel.v >= 6 then
-        if imgui.Checkbox(u8"Невидимость (/invis)", st.invisEnabled) then st.saveSettingsFlag = true end
+        if imgui.Checkbox(u8"РќРµРІРёРґРёРјРѕСЃС‚СЊ (/invis)", st.invisEnabled) then st.saveSettingsFlag = true end
         if st.invisEnabled.v then
-            imgui.TextColored(imgui.ImVec4(0,1,0,1), u8("Статус: ") .. (st.invisActive and u8"Включено" or u8"Выключено"))
-            if imgui.Button(u8"Переключить невидимость") then
+            imgui.TextColored(imgui.ImVec4(0,1,0,1), u8("РЎС‚Р°С‚СѓСЃ: ") .. (st.invisActive and u8"Р’РєР»СЋС‡РµРЅРѕ" or u8"Р’С‹РєР»СЋС‡РµРЅРѕ"))
+            if imgui.Button(u8"РџРµСЂРµРєР»СЋС‡РёС‚СЊ РЅРµРІРёРґРёРјРѕСЃС‚СЊ") then
                 FHA_cmd_invis()
             end
         end
     else
-        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"Невидимость [уровень 6+]")
+        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"РќРµРІРёРґРёРјРѕСЃС‚СЊ [СѓСЂРѕРІРµРЅСЊ 6+]")
     end
     
     imgui.Text(u8"AirBrake")
     if st.adminLevel.v >= 6 then
-        if imgui.Checkbox(u8"Включить AirBrake (RSHIFT)", st.airbrakeEnabled) then st.saveSettingsFlag = true end
+        if imgui.Checkbox(u8"Р’РєР»СЋС‡РёС‚СЊ AirBrake (RSHIFT)", st.airbrakeEnabled) then st.saveSettingsFlag = true end
     else
-        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"AirBrake [уровень 6+]")
+        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"AirBrake [СѓСЂРѕРІРµРЅСЊ 6+]")
     end
     
     imgui.Text(u8"GM Car")
@@ -3202,37 +3213,37 @@ local function DrawTab4_Cyber()
         if imgui.Checkbox(u8"GM Car", st.gmCarEnabled) then
             st.saveSettingsFlag = true
         end
-        imgui.TextDisabled(u8"(Админ 6+)")
+        imgui.TextDisabled(u8"(РђРґРјРёРЅ 6+)")
     else
-        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"GM Car [уровень 6+]")
+        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"GM Car [СѓСЂРѕРІРµРЅСЊ 6+]")
     end
 
-    -- ===== ZZVEH НАСТРОЙКА =====
-    imgui.Text(u8"Обход Зелёной Зоны (ZZVeh)")
+    -- ===== ZZVEH РќРђРЎРўР РћР™РљРђ =====
+    imgui.Text(u8"РћР±С…РѕРґ Р—РµР»С‘РЅРѕР№ Р—РѕРЅС‹ (ZZVeh)")
     if st.adminLevel.v >= 6 then
-        if imgui.Checkbox(u8"Включить ZZVeh (создание машин в ЗЗ)", st.zzvehEnabled) then
+        if imgui.Checkbox(u8"Р’РєР»СЋС‡РёС‚СЊ ZZVeh (СЃРѕР·РґР°РЅРёРµ РјР°С€РёРЅ РІ Р—Р—)", st.zzvehEnabled) then
             st.saveSettingsFlag = true
             if st.zzvehEnabled.v then
-                sampAddChatMessage("{33FF33}[FastHelperAdm] ZZVeh включен! Просто пишите /veh [id] [c1] [c2]", -1)
+                sampAddChatMessage("{33FF33}[FastHelperAdm] ZZVeh РІРєР»СЋС‡РµРЅ! РџСЂРѕСЃС‚Рѕ РїРёС€РёС‚Рµ /veh [id] [c1] [c2]", -1)
             else
-                sampAddChatMessage("{FF4444}[FastHelperAdm] ZZVeh выключен", -1)
+                sampAddChatMessage("{FF4444}[FastHelperAdm] ZZVeh РІС‹РєР»СЋС‡РµРЅ", -1)
             end
         end
-        imgui.TextDisabled(u8"(Админ 6+)")
+        imgui.TextDisabled(u8"(РђРґРјРёРЅ 6+)")
         if st.zzvehEnabled.v then
-            imgui.TextColored(imgui.ImVec4(0.5, 0.8, 1, 1), u8"Как работает:")
-            imgui.Text(u8"• Пишите /veh [id] [c1] [c2] в зелёной зоне")
-            imgui.Text(u8"• Вы будете телепортированы вне зоны на 1 секунду")
-            imgui.Text(u8"• Машина создастся на вашем месте")
-            imgui.Text(u8"• Вы вернётесь обратно с машиной!")
+            imgui.TextColored(imgui.ImVec4(0.5, 0.8, 1, 1), u8"РљР°Рє СЂР°Р±РѕС‚Р°РµС‚:")
+            imgui.Text(u8"вЂў РџРёС€РёС‚Рµ /veh [id] [c1] [c2] РІ Р·РµР»С‘РЅРѕР№ Р·РѕРЅРµ")
+            imgui.Text(u8"вЂў Р’С‹ Р±СѓРґРµС‚Рµ С‚РµР»РµРїРѕСЂС‚РёСЂРѕРІР°РЅС‹ РІРЅРµ Р·РѕРЅС‹ РЅР° 1 СЃРµРєСѓРЅРґСѓ")
+            imgui.Text(u8"вЂў РњР°С€РёРЅР° СЃРѕР·РґР°СЃС‚СЃСЏ РЅР° РІР°С€РµРј РјРµСЃС‚Рµ")
+            imgui.Text(u8"вЂў Р’С‹ РІРµСЂРЅС‘С‚РµСЃСЊ РѕР±СЂР°С‚РЅРѕ СЃ РјР°С€РёРЅРѕР№!")
         end
     else
-        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"ZZVeh [уровень 6+]")
+        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"ZZVeh [СѓСЂРѕРІРµРЅСЊ 6+]")
     end
 
-    imgui.Text(u8"Авто Ввод команд")
+    imgui.Text(u8"РђРІС‚Рѕ Р’РІРѕРґ РєРѕРјР°РЅРґ")
     if st.adminLevel.v >= 6 then
-        if imgui.Checkbox(u8"Авто Ввод", st.autoEnable) then st.saveSettingsFlag = true end
+        if imgui.Checkbox(u8"РђРІС‚Рѕ Р’РІРѕРґ", st.autoEnable) then st.saveSettingsFlag = true end
         if st.autoEnable.v then
             imgui.Checkbox(u8"/agm", st.autoAgm)
             imgui.Checkbox(u8"/chat", st.autoChat)
@@ -3241,7 +3252,7 @@ local function DrawTab4_Cyber()
             imgui.Checkbox(u8"/togphone", st.autoTogphone)
         end
     else
-        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"Авто Ввод [уровень 6+]")
+        imgui.TextColored(imgui.ImVec4(0.5,0.5,0.5,1), u8"РђРІС‚Рѕ Р’РІРѕРґ [СѓСЂРѕРІРµРЅСЊ 6+]")
     end
 
     -- WALLHACK
@@ -3257,20 +3268,20 @@ local function DrawTab4_Cyber()
     imgui.PushStyleColor(imgui.Col.Text, imgui.ImVec4(0.6, 0.05, 0.85, 1.0))
     imgui.Text("(?)")
     if imgui.IsItemHovered() then
-        imgui.SetTooltip(u8"Видеть сквозь стены")
+        imgui.SetTooltip(u8"Р’РёРґРµС‚СЊ СЃРєРІРѕР·СЊ СЃС‚РµРЅС‹")
     end
     imgui.PopStyleColor()
 
     if wh_settings.enabled then
-        if imgui.Checkbox(u8"По нику", wh_by_nick_checkbox) then
+        if imgui.Checkbox(u8"РџРѕ РЅРёРєСѓ", wh_by_nick_checkbox) then
             wh_settings.by_nick = wh_by_nick_checkbox.v
             st.saveSettingsFlag = true
         end
-        if imgui.Checkbox(u8"По скелету", wh_by_skeleton_checkbox) then
+        if imgui.Checkbox(u8"РџРѕ СЃРєРµР»РµС‚Сѓ", wh_by_skeleton_checkbox) then
             wh_settings.by_skeleton = wh_by_skeleton_checkbox.v
             st.saveSettingsFlag = true
         end
-        if imgui.Checkbox(u8"Показывать на скрине", wh_show_on_screenshot_checkbox) then
+        if imgui.Checkbox(u8"РџРѕРєР°Р·С‹РІР°С‚СЊ РЅР° СЃРєСЂРёРЅРµ", wh_show_on_screenshot_checkbox) then
             wh_settings.show_on_screenshot = wh_show_on_screenshot_checkbox.v
             st.saveSettingsFlag = true
         end
@@ -3281,13 +3292,13 @@ local function DrawTab4_Cyber()
     imgui.Spacing()
     
     imgui.TextColored(imgui.ImVec4(0.7, 0.4, 0.9, 1), u8"Kill List ID")
-    if imgui.Checkbox(u8"Показывать ID в килл листе", imgui.ImBool(killList.enabled)) then
+    if imgui.Checkbox(u8"РџРѕРєР°Р·С‹РІР°С‚СЊ ID РІ РєРёР»Р» Р»РёСЃС‚Рµ", imgui.ImBool(killList.enabled)) then
         killList.toggle()
     end
     imgui.SameLine()
     if imgui.Button(u8" ? ", imgui.ImVec2(25, 20)) then end
     if imgui.IsItemHovered() then
-        imgui.SetTooltip(u8"Показывает ID игроков в списке убийств")
+        imgui.SetTooltip(u8"РџРѕРєР°Р·С‹РІР°РµС‚ ID РёРіСЂРѕРєРѕРІ РІ СЃРїРёСЃРєРµ СѓР±РёР№СЃС‚РІ")
     end
 
     -- ===== ADMIN RENDER =====
@@ -3297,7 +3308,7 @@ local function DrawTab4_Cyber()
     imgui.TextColored(imgui.ImVec4(0.4, 0.8, 1.0, 1), u8">>> ADMIN RENDER <<<")
     imgui.Spacing()
     
-    if imgui.Checkbox(u8"Включить Admin Render", adminRender.enabled) then
+    if imgui.Checkbox(u8"Р’РєР»СЋС‡РёС‚СЊ Admin Render", adminRender.enabled) then
         if adminRender.enabled.v then
             adminRender.init()
             adminRender.update()
@@ -3309,18 +3320,18 @@ local function DrawTab4_Cyber()
     if adminRender.enabled.v then
         imgui.Indent()
         
-        if imgui.Checkbox(u8"Показывать уровни", adminRender.showLvl) then
+        if imgui.Checkbox(u8"РџРѕРєР°Р·С‹РІР°С‚СЊ СѓСЂРѕРІРЅРё", adminRender.showLvl) then
             adminRender.saveFilter()
         end
-        if imgui.Checkbox(u8"Показывать статусы (AFK/re)", adminRender.showAction) then
+        if imgui.Checkbox(u8"РџРѕРєР°Р·С‹РІР°С‚СЊ СЃС‚Р°С‚СѓСЃС‹ (AFK/re)", adminRender.showAction) then
             adminRender.saveFilter()
         end
-        if imgui.Checkbox(u8"Показывать время активности", adminRender.showActive) then
+        if imgui.Checkbox(u8"РџРѕРєР°Р·С‹РІР°С‚СЊ РІСЂРµРјСЏ Р°РєС‚РёРІРЅРѕСЃС‚Рё", adminRender.showActive) then
             adminRender.saveFilter()
         end
         
         imgui.Spacing()
-        imgui.Text(u8"Фильтр по уровням:")
+        imgui.Text(u8"Р¤РёР»СЊС‚СЂ РїРѕ СѓСЂРѕРІРЅСЏРј:")
         
         for i = 1, 7 do
             local lvl = i
@@ -3347,14 +3358,14 @@ local function DrawTab4_Cyber()
         
         imgui.Spacing()
         
-        if imgui.Button(u8"Переместить список", imgui.ImVec2(-1, 30)) then
+        if imgui.Button(u8"РџРµСЂРµРјРµСЃС‚РёС‚СЊ СЃРїРёСЃРѕРє", imgui.ImVec2(-1, 30)) then
             adminRender.startMove()
         end
         
         if adminRender.isMoving then
             adminRender.updateMove()
-            imgui.TextColored(imgui.ImVec4(1, 1, 0, 1), u8"Нажмите ENTER для сохранения позиции")
-            imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8"Нажмите ESC для отмены")
+            imgui.TextColored(imgui.ImVec4(1, 1, 0, 1), u8"РќР°Р¶РјРёС‚Рµ ENTER РґР»СЏ СЃРѕС…СЂР°РЅРµРЅРёСЏ РїРѕР·РёС†РёРё")
+            imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8"РќР°Р¶РјРёС‚Рµ ESC РґР»СЏ РѕС‚РјРµРЅС‹")
             
             if wasKeyPressed(vkeys.VK_RETURN) then
                 adminRender.stopMove(true)
@@ -3365,9 +3376,9 @@ local function DrawTab4_Cyber()
         end
         
         imgui.Spacing()
-        imgui.Text(string.format("Позиция: X=%d Y=%d", adminRender.posX, adminRender.posY))
+        imgui.Text(string.format("РџРѕР·РёС†РёСЏ: X=%d Y=%d", adminRender.posX, adminRender.posY))
         
-        if imgui.Button(u8"Обновить список сейчас", imgui.ImVec2(-1, 25)) then
+        if imgui.Button(u8"РћР±РЅРѕРІРёС‚СЊ СЃРїРёСЃРѕРє СЃРµР№С‡Р°СЃ", imgui.ImVec2(-1, 25)) then
             adminRender.update()
         end
         
@@ -3375,83 +3386,83 @@ local function DrawTab4_Cyber()
     end
 end
 
--- ===== ВКЛАДКА 5: АВТО МЕРОПРИЯТИЕ, РАЗДАЧА, ОТБОР =====
+-- ===== Р’РљР›РђР”РљРђ 5: РђР’РўРћ РњР•Р РћРџР РРЇРўРР•, Р РђР—Р”РђР§Рђ, РћРўР‘РћР  =====
 local function DrawTab5_Cyber()
     local st = FHA.state
     
-    imgui.TextColored(cs.accent, u8">>> АВТО МЕРОПРИЯТИЕ <<<")
+    imgui.TextColored(cs.accent, u8">>> РђР’РўРћ РњР•Р РћРџР РРЇРўРР• <<<")
     imgui.Spacing()
     
     if st.adminLevel.v < 9 then
-        imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8"Доступно с 9 уровня администратора")
+        imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8"Р”РѕСЃС‚СѓРїРЅРѕ СЃ 9 СѓСЂРѕРІРЅСЏ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°")
         imgui.Separator()
         imgui.Spacing()
-        imgui.TextColored(cs.accent, u8">>> АВТО РАЗДАЧА <<<")
+        imgui.TextColored(cs.accent, u8">>> РђР’РўРћ Р РђР—Р”РђР§Рђ <<<")
         imgui.Spacing()
-        imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8"Доступно с 9 уровня администратора")
+        imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8"Р”РѕСЃС‚СѓРїРЅРѕ СЃ 9 СѓСЂРѕРІРЅСЏ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°")
         imgui.Separator()
         imgui.Spacing()
-        imgui.TextColored(cs.accent, u8">>> АВТО ОТБОР <<<")
+        imgui.TextColored(cs.accent, u8">>> РђР’РўРћ РћРўР‘РћР  <<<")
         imgui.Spacing()
-        imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8"Доступно с 9 уровня администратора")
+        imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8"Р”РѕСЃС‚СѓРїРЅРѕ СЃ 9 СѓСЂРѕРІРЅСЏ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°")
         return
     end
     
-    imgui.Text(u8"Выберите мероприятие:")
+    imgui.Text(u8"Р’С‹Р±РµСЂРёС‚Рµ РјРµСЂРѕРїСЂРёСЏС‚РёРµ:")
     
-    local mpChoices = {u8"Стандартное", u8"Своё"}
-    imgui.Combo(u8"Тип мероприятия", st.mp_selectEvent, mpChoices, #mpChoices)
+    local mpChoices = {u8"РЎС‚Р°РЅРґР°СЂС‚РЅРѕРµ", u8"РЎРІРѕС‘"}
+    imgui.Combo(u8"РўРёРї РјРµСЂРѕРїСЂРёСЏС‚РёСЏ", st.mp_selectEvent, mpChoices, #mpChoices)
     
     if st.mp_selectEvent.v == 0 then
-        imgui.Combo(u8"Название МП", st.combo_mp_name, st.mp_names, #st.mp_names)
+        imgui.Combo(u8"РќР°Р·РІР°РЅРёРµ РњРџ", st.combo_mp_name, st.mp_names, #st.mp_names)
     else
-        imgui.InputText(u8"Своё название", st.mp_custom_name)
+        imgui.InputText(u8"РЎРІРѕС‘ РЅР°Р·РІР°РЅРёРµ", st.mp_custom_name)
     end
     
-    imgui.InputText(u8"Приз", st.mp_prize_text)
+    imgui.InputText(u8"РџСЂРёР·", st.mp_prize_text)
     
     imgui.Spacing()
-    if imgui.Button(u8"Запустить мероприятие", imgui.ImVec2(-1, 30)) then
+    if imgui.Button(u8"Р—Р°РїСѓСЃС‚РёС‚СЊ РјРµСЂРѕРїСЂРёСЏС‚РёРµ", imgui.ImVec2(-1, 30)) then
         st.startAutoMpFlag = true
     end
     
     imgui.Separator()
     imgui.Spacing()
     
-    imgui.TextColored(cs.accent, u8">>> АВТО РАЗДАЧА <<<")
+    imgui.TextColored(cs.accent, u8">>> РђР’РўРћ Р РђР—Р”РђР§Рђ <<<")
     imgui.Spacing()
     
-    imgui.Text(u8"Слово для /rep")
+    imgui.Text(u8"РЎР»РѕРІРѕ РґР»СЏ /rep")
     imgui.InputText("##word", st.text_word)
     
-    imgui.Text(u8"Чат для объявления")
+    imgui.Text(u8"Р§Р°С‚ РґР»СЏ РѕР±СЉСЏРІР»РµРЅРёСЏ")
     imgui.Combo("##chat", st.combo_chat, st.arr_chat, #st.arr_chat)
     
-    imgui.Text(u8"Приз")
+    imgui.Text(u8"РџСЂРёР·")
     imgui.Combo("##prize", st.combo_priz, st.arr_priz, #st.arr_priz)
     
     local selectedPrizeIdx = st.combo_priz.v + 1
     local isStyle = (selectedPrizeIdx >= 11 and selectedPrizeIdx <= 13)
     
     if not isStyle then
-        imgui.Text(u8"Количество (5k, 1kk, 5000)")
+        imgui.Text(u8"РљРѕР»РёС‡РµСЃС‚РІРѕ (5k, 1kk, 5000)")
         imgui.InputText("##amount", st.text_real)
     else
-        imgui.TextColored(imgui.ImVec4(1, 1, 0, 1), u8"Стиль боя: кол-во не требуется")
+        imgui.TextColored(imgui.ImVec4(1, 1, 0, 1), u8"РЎС‚РёР»СЊ Р±РѕСЏ: РєРѕР»-РІРѕ РЅРµ С‚СЂРµР±СѓРµС‚СЃСЏ")
     end
     
     imgui.Spacing()
-    if imgui.Button(u8"Запустить раздачу", imgui.ImVec2(-1, 30)) then
+    if imgui.Button(u8"Р—Р°РїСѓСЃС‚РёС‚СЊ СЂР°Р·РґР°С‡Сѓ", imgui.ImVec2(-1, 30)) then
         st.startRazdachaFlag = true
     end
     
     imgui.Spacing()
     imgui.Separator()
-    imgui.Text(u8"Лог раздач:")
+    imgui.Text(u8"Р›РѕРі СЂР°Р·РґР°С‡:")
     
     imgui.BeginChild("##razd_log", imgui.ImVec2(0, 150), true)
     if #st.guiLog == 0 then
-        imgui.TextColored(imgui.ImVec4(0.5, 0.5, 0.5, 1), u8"Пусто")
+        imgui.TextColored(imgui.ImVec4(0.5, 0.5, 0.5, 1), u8"РџСѓСЃС‚Рѕ")
     else
         for i, entry in ipairs(st.guiLog) do
             imgui.TextWrapped(entry)
@@ -3462,47 +3473,47 @@ local function DrawTab5_Cyber()
     imgui.Separator()
     imgui.Spacing()
     
-    imgui.TextColored(cs.accent, u8">>> АВТО ОТБОР <<<")
+    imgui.TextColored(cs.accent, u8">>> РђР’РўРћ РћРўР‘РћР  <<<")
     imgui.Spacing()
     
-    imgui.Text(u8"Выберите лидерку:")
+    imgui.Text(u8"Р’С‹Р±РµСЂРёС‚Рµ Р»РёРґРµСЂРєСѓ:")
     
-    local otborChoices = {u8"Своё название", u8"Из списка"}
-    imgui.Combo(u8"Тип", st.otbor_selectLeader, otborChoices, #otborChoices)
+    local otborChoices = {u8"РЎРІРѕС‘ РЅР°Р·РІР°РЅРёРµ", u8"РР· СЃРїРёСЃРєР°"}
+    imgui.Combo(u8"РўРёРї", st.otbor_selectLeader, otborChoices, #otborChoices)
     
     if st.otbor_selectLeader.v == 0 then
-        imgui.InputText(u8"Название лидерки", st.otbor_leader_name)
+        imgui.InputText(u8"РќР°Р·РІР°РЅРёРµ Р»РёРґРµСЂРєРё", st.otbor_leader_name)
     else
         local fractionNames = {}
         for _, fr in ipairs(st.fractions) do
             table.insert(fractionNames, u8:decode(fr.name))
         end
-        imgui.Combo(u8"Фракция", st.otbor_leader_combo, fractionNames, #fractionNames)
+        imgui.Combo(u8"Р¤СЂР°РєС†РёСЏ", st.otbor_leader_combo, fractionNames, #fractionNames)
     end
     
-    imgui.Text(u8"Чат для объявления")
+    imgui.Text(u8"Р§Р°С‚ РґР»СЏ РѕР±СЉСЏРІР»РµРЅРёСЏ")
     local chatChoices = {"aad", "o"}
     imgui.Combo("##otbor_chat", st.otbor_chat, chatChoices, #chatChoices)
     
     imgui.Spacing()
-    if imgui.Button(u8"Запустить отбор", imgui.ImVec2(-1, 30)) then
+    if imgui.Button(u8"Р—Р°РїСѓСЃС‚РёС‚СЊ РѕС‚Р±РѕСЂ", imgui.ImVec2(-1, 30)) then
         st.startAutoOtborFlag = true
     end
 end
 
--- ===== ВКЛАДКА 6: ВРЕМЕННОЕ ЛИДЕРСТВО =====
+-- ===== Р’РљР›РђР”РљРђ 6: Р’Р Р•РњР•РќРќРћР• Р›РР”Р•Р РЎРўР’Рћ =====
 local function DrawTab6_Cyber()
     local st = FHA.state
     
-    imgui.TextColored(cs.accent, u8">>> ВРЕМЕННОЕ ЛИДЕРСТВО <<<")
+    imgui.TextColored(cs.accent, u8">>> Р’Р Р•РњР•РќРќРћР• Р›РР”Р•Р РЎРўР’Рћ <<<")
     imgui.Spacing()
     
     if st.adminLevel.v < 9 then
-        imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8"Доступно с 9 уровня администратора")
+        imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8"Р”РѕСЃС‚СѓРїРЅРѕ СЃ 9 СѓСЂРѕРІРЅСЏ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°")
         return
     end
     
-    imgui.TextWrapped(u8"Выберите фракцию для получения временного лидерства. При нажатии будет отправлена команда /templeader [номер фракции]")
+    imgui.TextWrapped(u8"Р’С‹Р±РµСЂРёС‚Рµ С„СЂР°РєС†РёСЋ РґР»СЏ РїРѕР»СѓС‡РµРЅРёСЏ РІСЂРµРјРµРЅРЅРѕРіРѕ Р»РёРґРµСЂСЃС‚РІР°. РџСЂРё РЅР°Р¶Р°С‚РёРё Р±СѓРґРµС‚ РѕС‚РїСЂР°РІР»РµРЅР° РєРѕРјР°РЅРґР° /templeader [РЅРѕРјРµСЂ С„СЂР°РєС†РёРё]")
     imgui.Spacing()
     imgui.Separator()
     imgui.Spacing()
@@ -3525,9 +3536,9 @@ local function DrawTab6_Cyber()
     imgui.Columns(1)
 end
 
--- ===== ВКЛАДКА 7: ПРАВИЛА =====
+-- ===== Р’РљР›РђР”РљРђ 7: РџР РђР’РР›Рђ =====
 local function DrawTab7_Cyber()
-    imgui.TextColored(cs.accent, u8">>> ПРАВИЛА СЕРВЕРОВ <<<")
+    imgui.TextColored(cs.accent, u8">>> РџР РђР’РР›Рђ РЎР•Р Р’Р•Р РћР’ <<<")
     imgui.Spacing()
 
     if imgui.Button(u8"ENVY") then 
@@ -3545,7 +3556,7 @@ local function DrawTab7_Cyber()
         FHA_loadAngerRules()
     end
 
-    imgui.InputText(u8"Поиск по правилам", FHA.rulesSearch)
+    imgui.InputText(u8"РџРѕРёСЃРє РїРѕ РїСЂР°РІРёР»Р°Рј", FHA.rulesSearch)
 
     local searchText = FHA.rulesSearch.v
     local searchDecoded = u8:decode(searchText)
@@ -3553,7 +3564,7 @@ local function DrawTab7_Cyber()
     imgui.BeginChild("rules_scroll", imgui.ImVec2(0, 0), true, imgui.WindowFlags.VerticalScrollbar)
     
     if searchDecoded ~= "" then
-        imgui.TextColored(imgui.ImVec4(0, 1, 0, 1), u8("Поиск: ") .. u8('"' .. searchDecoded .. '"'))
+        imgui.TextColored(imgui.ImVec4(0, 1, 0, 1), u8("РџРѕРёСЃРє: ") .. u8('"' .. searchDecoded .. '"'))
         
         local function searchInRules(rulesTable, sectionName)
             local foundLines = {}
@@ -3588,7 +3599,7 @@ local function DrawTab7_Cyber()
                 end
             end
             if not found then
-                imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8("По запросу '" .. searchDecoded .. "' ничего не найдено"))
+                imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8("РџРѕ Р·Р°РїСЂРѕСЃСѓ '" .. searchDecoded .. "' РЅРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ"))
             end
         elseif FHA.rulesMode == 2 then
             local found = false
@@ -3607,7 +3618,7 @@ local function DrawTab7_Cyber()
                 end
             end
             if not found then
-                imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8("По запросу '" .. searchDecoded .. "' ничего не найдено"))
+                imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8("РџРѕ Р·Р°РїСЂРѕСЃСѓ '" .. searchDecoded .. "' РЅРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ"))
             end
         else
             local found = false
@@ -3626,7 +3637,7 @@ local function DrawTab7_Cyber()
                 end
             end
             if not found then
-                imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8("По запросу '" .. searchDecoded .. "' ничего не найдено"))
+                imgui.TextColored(imgui.ImVec4(1, 0.5, 0, 1), u8("РџРѕ Р·Р°РїСЂРѕСЃСѓ '" .. searchDecoded .. "' РЅРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ"))
             end
         end
     else
@@ -3705,43 +3716,43 @@ local function DrawTab7_Cyber()
     imgui.EndChild()
 end
 
--- ===== ВКЛАДКА 8: ОБНОВЛЕНИЯ =====
+-- ===== Р’РљР›РђР”РљРђ 8: РћР‘РќРћР’Р›Р•РќРРЇ =====
 local function DrawTab8_Cyber()
-    imgui.TextColored(cs.accent, u8">>> ОБНОВЛЕНИЯ <<<")
+    imgui.TextColored(cs.accent, u8">>> РћР‘РќРћР’Р›Р•РќРРЇ <<<")
     imgui.Spacing()
     imgui.PushTextWrapPos(imgui.GetWindowWidth() - 20)
     imgui.TextWrapped(u8(
-        "FastHelperAdm История обновлений:\n\n" ..
-        "v1.0 — Релиз\n" ..
-        "v1.2 — Фикс багов\n" ..
-        "v1.4 — Улучшения\n" ..
-        "v1.5 — Авто Раздача\n" ..
-        "v1.55 — Фикс багов 2\n" ..
-        "v1.60 — Авто Пожелание + Ответы на Репорты + Авто-команды через 10 сек\n" ..
-        "v1.70 — Добавлена выдача себе лидерки + Добавлено авто мероприятие + Фикс неких багов\n" ..
-        "v1.75 — Добавлен Авто Отбор и добавлен визуал для меню\n" ..
-        "v1.80 — Фикс Багов 3\n" ..
-        "v1.9 — Добавлен Трейсер Пуль, ClickWarp (Телепорт на колёсико мыши) + Выбор пола м/ж в настройках меню + Фикс Багов + Авто Пожелание GG\n" ..
-        "v2.0 — Возвращена вкладка Ответы на Репорты + Улучшенная система ответов + Добавлена вкладка Правила Серверов (Envy/Pride/Anger) с поиском + Добавлена функция Невидимости + Добавлена функция AirBrake + Фикс Автораздачи\n" ..
-        "v2.1 — Добавлен Авто Alogin (6+), GM Car (GM + Визуал), Новое UI меню, Покраска Гетто, Фикс Автораздачи#2, Speedhack, WallHack, Фикс скелета при открытом меню, Kill List ID, Admin Render, ZZVeh (обход зелёной зоны для /veh)\n"
+        "FastHelperAdm РСЃС‚РѕСЂРёСЏ РѕР±РЅРѕРІР»РµРЅРёР№:\n\n" ..
+        "v1.0 вЂ” Р РµР»РёР·\n" ..
+        "v1.2 вЂ” Р¤РёРєСЃ Р±Р°РіРѕРІ\n" ..
+        "v1.4 вЂ” РЈР»СѓС‡С€РµРЅРёСЏ\n" ..
+        "v1.5 вЂ” РђРІС‚Рѕ Р Р°Р·РґР°С‡Р°\n" ..
+        "v1.55 вЂ” Р¤РёРєСЃ Р±Р°РіРѕРІ 2\n" ..
+        "v1.60 вЂ” РђРІС‚Рѕ РџРѕР¶РµР»Р°РЅРёРµ + РћС‚РІРµС‚С‹ РЅР° Р РµРїРѕСЂС‚С‹ + РђРІС‚Рѕ-РєРѕРјР°РЅРґС‹ С‡РµСЂРµР· 10 СЃРµРє\n" ..
+        "v1.70 вЂ” Р”РѕР±Р°РІР»РµРЅР° РІС‹РґР°С‡Р° СЃРµР±Рµ Р»РёРґРµСЂРєРё + Р”РѕР±Р°РІР»РµРЅРѕ Р°РІС‚Рѕ РјРµСЂРѕРїСЂРёСЏС‚РёРµ + Р¤РёРєСЃ РЅРµРєРёС… Р±Р°РіРѕРІ\n" ..
+        "v1.75 вЂ” Р”РѕР±Р°РІР»РµРЅ РђРІС‚Рѕ РћС‚Р±РѕСЂ Рё РґРѕР±Р°РІР»РµРЅ РІРёР·СѓР°Р» РґР»СЏ РјРµРЅСЋ\n" ..
+        "v1.80 вЂ” Р¤РёРєСЃ Р‘Р°РіРѕРІ 3\n" ..
+        "v1.9 вЂ” Р”РѕР±Р°РІР»РµРЅ РўСЂРµР№СЃРµСЂ РџСѓР»СЊ, ClickWarp (РўРµР»РµРїРѕСЂС‚ РЅР° РєРѕР»С‘СЃРёРєРѕ РјС‹С€Рё) + Р’С‹Р±РѕСЂ РїРѕР»Р° Рј/Р¶ РІ РЅР°СЃС‚СЂРѕР№РєР°С… РјРµРЅСЋ + Р¤РёРєСЃ Р‘Р°РіРѕРІ + РђРІС‚Рѕ РџРѕР¶РµР»Р°РЅРёРµ GG\n" ..
+        "v2.0 вЂ” Р’РѕР·РІСЂР°С‰РµРЅР° РІРєР»Р°РґРєР° РћС‚РІРµС‚С‹ РЅР° Р РµРїРѕСЂС‚С‹ + РЈР»СѓС‡С€РµРЅРЅР°СЏ СЃРёСЃС‚РµРјР° РѕС‚РІРµС‚РѕРІ + Р”РѕР±Р°РІР»РµРЅР° РІРєР»Р°РґРєР° РџСЂР°РІРёР»Р° РЎРµСЂРІРµСЂРѕРІ (Envy/Pride/Anger) СЃ РїРѕРёСЃРєРѕРј + Р”РѕР±Р°РІР»РµРЅР° С„СѓРЅРєС†РёСЏ РќРµРІРёРґРёРјРѕСЃС‚Рё + Р”РѕР±Р°РІР»РµРЅР° С„СѓРЅРєС†РёСЏ AirBrake + Р¤РёРєСЃ РђРІС‚РѕСЂР°Р·РґР°С‡Рё\n" ..
+        "v2.1 вЂ” Р”РѕР±Р°РІР»РµРЅ РђРІС‚Рѕ Alogin (6+), GM Car (GM + Р’РёР·СѓР°Р»), РќРѕРІРѕРµ UI РјРµРЅСЋ, РџРѕРєСЂР°СЃРєР° Р“РµС‚С‚Рѕ, Р¤РёРєСЃ РђРІС‚РѕСЂР°Р·РґР°С‡Рё#2, Speedhack, WallHack, Р¤РёРєСЃ СЃРєРµР»РµС‚Р° РїСЂРё РѕС‚РєСЂС‹С‚РѕРј РјРµРЅСЋ, Kill List ID, Admin Render, ZZVeh (РѕР±С…РѕРґ Р·РµР»С‘РЅРѕР№ Р·РѕРЅС‹ РґР»СЏ /veh)\n"
     ));
     imgui.PopTextWrapPos()
 end
 
--- ===== ВКЛАДКА 9: ОБ АВТОРЕ =====
+-- ===== Р’РљР›РђР”РљРђ 9: РћР‘ РђР’РўРћР Р• =====
 local function DrawTab9_Cyber()
-    imgui.TextColored(cs.accent, u8">>> ОБ АВТОРЕ <<<")
+    imgui.TextColored(cs.accent, u8">>> РћР‘ РђР’РўРћР Р• <<<")
     imgui.Spacing()
     imgui.TextWrapped(
-        u8("FastHelperAdm v2.1\nАвтор: Alim Akimov\n@waldemar03")
+        u8("FastHelperAdm v2.1\nРђРІС‚РѕСЂ: Alim Akimov\n@waldemar03")
     )
 end
 
--- ===== ВКЛАДКА 10: ПОКРАСКА ГЕТТО =====
+-- ===== Р’РљР›РђР”РљРђ 10: РџРћРљР РђРЎРљРђ Р“Р•РўРўРћ =====
 local function DrawTab10_Cyber()
     local st = FHA.state
     
-    imgui.TextColored(cs.accent, u8">>> ПОКРАСКА ГЕТТО <<<")
+    imgui.TextColored(cs.accent, u8">>> РџРћРљР РђРЎРљРђ Р“Р•РўРўРћ <<<")
     imgui.Spacing()
     
     if not st.gz_initialized then
@@ -3762,16 +3773,16 @@ local function DrawTab10_Cyber()
     
     if st.gz_autoReform.active then
         if st.gz_autoReform.paused then
-            if imgui.Button(u8("ПРОДОЛЖИТЬ"), imgui.ImVec2(120, 30)) then GZ_pauseAutoReform() end
+            if imgui.Button(u8("РџР РћР”РћР›Р–РРўР¬"), imgui.ImVec2(120, 30)) then GZ_pauseAutoReform() end
         else
-            if imgui.Button(u8("ПАУЗА"), imgui.ImVec2(120, 30)) then GZ_pauseAutoReform() end
+            if imgui.Button(u8("РџРђРЈР—Рђ"), imgui.ImVec2(120, 30)) then GZ_pauseAutoReform() end
         end
         imgui.SameLine()
-        if imgui.Button(u8("СТОП"), imgui.ImVec2(120, 30)) then GZ_stopAutoReform() end
+        if imgui.Button(u8("РЎРўРћРџ"), imgui.ImVec2(120, 30)) then GZ_stopAutoReform() end
         imgui.Spacing()
         imgui.TextColored(imgui.ImVec4(0, 1, 0, 1), string.format("Progress: %d/%d", st.gz_autoReform.currentIndex - 1, #allReformZones))
     else
-        if imgui.Button(u8("СТАРТ"), imgui.ImVec2(120, 30)) then
+        if imgui.Button(u8("РЎРўРђР Рў"), imgui.ImVec2(120, 30)) then
             st.gz_showConfirm = true
         end
         imgui.SameLine()
@@ -3870,8 +3881,8 @@ local function DrawTab10_Cyber()
                     imgui.BeginTooltip()
                     imgui.Text(string.format("Zone ID: %d", zoneId))
                     imgui.Text(string.format("Gang: %s", GZ_getDisplayName(zone.gang)))
-                    imgui.Text(u8"ЛКМ - Телепорт")
-                    imgui.Text(u8"ПКМ - Покрасить")
+                    imgui.Text(u8"Р›РљРњ - РўРµР»РµРїРѕСЂС‚")
+                    imgui.Text(u8"РџРљРњ - РџРѕРєСЂР°СЃРёС‚СЊ")
                     if isUnderCap then 
                         local att = GZ_getZoneAttacker(zoneId)
                         if att then 
@@ -3930,7 +3941,7 @@ local function DrawTab10_Cyber()
     end
 end
 
--- ===== ОСНОВНОЕ МЕНЮ =====
+-- ===== РћРЎРќРћР’РќРћР• РњР•РќР® =====
 local function DrawCyberMenu()
     if not menu.visible then return end
     
@@ -4055,16 +4066,16 @@ local function DrawCyberMenu()
     imgui.SetColumnWidth(0, 175)
     
     local tabs = {
-        u8"Основное",
-        u8"Настройки", 
-        u8"Репорты", 
-        u8"Функции", 
-        u8"Авто",
-        u8"Врем. Лидер",
-        u8"Правила",
-        u8"Обновления",
-        u8"Об авторе",
-        u8"Покраска Гетто"
+        u8"РћСЃРЅРѕРІРЅРѕРµ",
+        u8"РќР°СЃС‚СЂРѕР№РєРё", 
+        u8"Р РµРїРѕСЂС‚С‹", 
+        u8"Р¤СѓРЅРєС†РёРё", 
+        u8"РђРІС‚Рѕ",
+        u8"Р’СЂРµРј. Р›РёРґРµСЂ",
+        u8"РџСЂР°РІРёР»Р°",
+        u8"РћР±РЅРѕРІР»РµРЅРёСЏ",
+        u8"РћР± Р°РІС‚РѕСЂРµ",
+        u8"РџРѕРєСЂР°СЃРєР° Р“РµС‚С‚Рѕ"
     }
     
     for i, name in ipairs(tabs) do
@@ -4174,7 +4185,7 @@ local function DrawCyberMenu()
     end
 end
 
--- ===== ФУНКЦИИ ДЛЯ ВКЛАДОК =====
+-- ===== Р¤РЈРќРљР¦РР Р”Р›РЇ Р’РљР›РђР”РћРљ =====
 function FHA_DrawTab1() DrawTab1_Cyber() end
 function FHA_DrawTab2() DrawTab2_Cyber() end
 function FHA_DrawTab3() DrawTab3_Cyber() end
@@ -4189,7 +4200,7 @@ function FHA_DrawTab11() end
 
 function FHA_DrawMainMenu() end
 
--- ===== ОБРАБОТЧИКИ МЕРОПРИЯТИЙ =====
+-- ===== РћР‘Р РђР‘РћРўР§РРљР РњР•Р РћРџР РРЇРўРР™ =====
 function FHA_doAutoMP()
     local st = FHA.state
     local mpName
@@ -4200,14 +4211,14 @@ function FHA_doAutoMP()
         if st.mp_custom_name.v ~= "" then
             mpName = u8:decode(st.mp_custom_name.v)
         else
-            sampAddChatMessage("{FF4444}[MP] Укажите название мероприятия", -1)
+            sampAddChatMessage("{FF4444}[MP] РЈРєР°Р¶РёС‚Рµ РЅР°Р·РІР°РЅРёРµ РјРµСЂРѕРїСЂРёСЏС‚РёСЏ", -1)
             return
         end
     end
 
     local prizeText = u8:decode(st.mp_prize_text.v)
     if prizeText == "" then
-        sampAddChatMessage("{FF4444}[MP] Укажите приз мероприятия", -1)
+        sampAddChatMessage("{FF4444}[MP] РЈРєР°Р¶РёС‚Рµ РїСЂРёР· РјРµСЂРѕРїСЂРёСЏС‚РёСЏ", -1)
         return
     end
 
@@ -4219,11 +4230,11 @@ function FHA_doAutoMP()
         wait(1000)
     end
     
-    sampSendChat('/aad MP | Уважаемые игроки, сейчас пройдет мероприятие "'..mpName..'"')
+    sampSendChat('/aad MP | РЈРІР°Р¶Р°РµРјС‹Рµ РёРіСЂРѕРєРё, СЃРµР№С‡Р°СЃ РїСЂРѕР№РґРµС‚ РјРµСЂРѕРїСЂРёСЏС‚РёРµ "'..mpName..'"')
     wait(1000)
-    sampSendChat('/aad MP | Приз: '..prizeText)
+    sampSendChat('/aad MP | РџСЂРёР·: '..prizeText)
     wait(1000)
-    sampSendChat('/aad MP | Желающие /gomp')
+    sampSendChat('/aad MP | Р–РµР»Р°СЋС‰РёРµ /gomp')
     wait(1000)
 
     st.mpAutoStep = 1
@@ -4239,7 +4250,7 @@ function FHA_doAutoOtbor()
         if selectedFractionIndex >= 1 and selectedFractionIndex <= #st.fractions then
             leaderNameCP1251 = u8:decode(st.fractions[selectedFractionIndex].name)
         else
-            sampAddChatMessage("{FF4444}[Отбор] Ошибка: Неверный индекс фракции в списке.", -1)
+            sampAddChatMessage("{FF4444}[РћС‚Р±РѕСЂ] РћС€РёР±РєР°: РќРµРІРµСЂРЅС‹Р№ РёРЅРґРµРєСЃ С„СЂР°РєС†РёРё РІ СЃРїРёСЃРєРµ.", -1)
             return
         end
     else
@@ -4249,7 +4260,7 @@ function FHA_doAutoOtbor()
     leaderNameCP1251 = leaderNameCP1251:gsub("^%s*(.-)%s*$", "%1") 
 
     if leaderNameCP1251 == "" then
-        sampAddChatMessage("{FF4444}[Отбор] Укажите название лидерки", -1)
+        sampAddChatMessage("{FF4444}[РћС‚Р±РѕСЂ] РЈРєР°Р¶РёС‚Рµ РЅР°Р·РІР°РЅРёРµ Р»РёРґРµСЂРєРё", -1)
         return
     end
 
@@ -4263,13 +4274,13 @@ function FHA_doAutoOtbor()
         wait(1000)
     end
     
-    sampSendChat('/'..chatCmd..' ОТБОР | Сейчас пройдёт отбор на лидера "'..leaderNameCP1251..'"')
+    sampSendChat('/'..chatCmd..' РћРўР‘РћР  | РЎРµР№С‡Р°СЃ РїСЂРѕР№РґС‘С‚ РѕС‚Р±РѕСЂ РЅР° Р»РёРґРµСЂР° "'..leaderNameCP1251..'"')
     wait(1000)
 
-    sampSendChat('/'..chatCmd..' ОТБОР | Критерий: 2+ часов на аккаунте, иметь вк')
+    sampSendChat('/'..chatCmd..' РћРўР‘РћР  | РљСЂРёС‚РµСЂРёР№: 2+ С‡Р°СЃРѕРІ РЅР° Р°РєРєР°СѓРЅС‚Рµ, РёРјРµС‚СЊ РІРє')
     wait(1000)
 
-    sampSendChat('/'..chatCmd..' ОТБОР | Желающий /gomp')
+    sampSendChat('/'..chatCmd..' РћРўР‘РћР  | Р–РµР»Р°СЋС‰РёР№ /gomp')
     wait(1000)
 
     st.otborRunning = true
@@ -4280,7 +4291,7 @@ function FHA_doRazdacha()
     local st = FHA.state
     
     if st.razdInProgress then
-        sampAddChatMessage("{FF4444}[FastHelperAdm] Раздача уже запущена! Дождитесь окончания.", -1)
+        sampAddChatMessage("{FF4444}[FastHelperAdm] Р Р°Р·РґР°С‡Р° СѓР¶Рµ Р·Р°РїСѓС‰РµРЅР°! Р”РѕР¶РґРёС‚РµСЃСЊ РѕРєРѕРЅС‡Р°РЅРёСЏ.", -1)
         return
     end
     
@@ -4290,20 +4301,20 @@ function FHA_doRazdacha()
     local amount = isStyle and 50000 or (FHA_parseAmount(st.text_real.v) or 0)
     
     if st.text_word.v == "" or st.text_word.v == " " then
-        sampAddChatMessage("{FF4444}[FastHelperAdm] Укажите слово для /rep", -1)
+        sampAddChatMessage("{FF4444}[FastHelperAdm] РЈРєР°Р¶РёС‚Рµ СЃР»РѕРІРѕ РґР»СЏ /rep", -1)
         return
     end
     
     if not isStyle and (amount == nil or amount <= 0) then
-        sampAddChatMessage("{FF4444}[FastHelperAdm] Укажите корректное количество (пример: 5k, 1kk, 5000)", -1)
+        sampAddChatMessage("{FF4444}[FastHelperAdm] РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅРѕРµ РєРѕР»РёС‡РµСЃС‚РІРѕ (РїСЂРёРјРµСЂ: 5k, 1kk, 5000)", -1)
         return
     end
     
     local txt
     if isStyle then
-        txt = "РАЗДАЧА | Кто первый напишет /rep "..u8:decode(st.text_word.v).." получит стиль \""..pName.."\""
+        txt = "Р РђР—Р”РђР§Рђ | РљС‚Рѕ РїРµСЂРІС‹Р№ РЅР°РїРёС€РµС‚ /rep "..u8:decode(st.text_word.v).." РїРѕР»СѓС‡РёС‚ СЃС‚РёР»СЊ \""..pName.."\""
     else
-        txt = "РАЗДАЧА | Кто первый напишет /rep "..u8:decode(st.text_word.v).." получит "..formatMoneySmart(amount).." "..pName
+        txt = "Р РђР—Р”РђР§Рђ | РљС‚Рѕ РїРµСЂРІС‹Р№ РЅР°РїРёС€РµС‚ /rep "..u8:decode(st.text_word.v).." РїРѕР»СѓС‡РёС‚ "..formatMoneySmart(amount).." "..pName
     end
     
     sampSendChat('/'..st.arr_chat[st.combo_chat.v+1]..' '..txt)
@@ -4321,21 +4332,21 @@ function FHA_doRazdacha()
     st.razd_player_id = -1
     st.razdTimeout = os.clock() + 30
     
-    sampAddChatMessage("{33CCFF}[FastHelperAdm] Раздача запущена! Ожидание ответа 30 секунд...", -1)
+    sampAddChatMessage("{33CCFF}[FastHelperAdm] Р Р°Р·РґР°С‡Р° Р·Р°РїСѓС‰РµРЅР°! РћР¶РёРґР°РЅРёРµ РѕС‚РІРµС‚Р° 30 СЃРµРєСѓРЅРґ...", -1)
 end
 
--- ===== AIRBRAKE ФУНКЦИИ =====
+-- ===== AIRBRAKE Р¤РЈРќРљР¦РР =====
 local airBrkCoords = {0, 0, 0}
 
 function FHA_toggleAirBrake()
     local st = FHA.state
     
     if not st.airbrakeEnabled.v then
-        sampAddChatMessage("{FF4444}[FastHelperAdm] Функция AirBrake не активирована в меню скрипта.", -1)
+        sampAddChatMessage("{FF4444}[FastHelperAdm] Р¤СѓРЅРєС†РёСЏ AirBrake РЅРµ Р°РєС‚РёРІРёСЂРѕРІР°РЅР° РІ РјРµРЅСЋ СЃРєСЂРёРїС‚Р°.", -1)
         return
     end
     if st.adminLevel.v < 6 then
-        sampAddChatMessage("{FF4444}[FastHelperAdm] Для использования AirBrake требуется уровень администратора 6+.", -1)
+        sampAddChatMessage("{FF4444}[FastHelperAdm] Р”Р»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ AirBrake С‚СЂРµР±СѓРµС‚СЃСЏ СѓСЂРѕРІРµРЅСЊ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР° 6+.", -1)
         return
     end
 
@@ -4415,7 +4426,7 @@ function FHA_onWindowMessage(msg, wparam, lparam)
     end 
 end
 
--- ===== CLICKWARP ФУНКЦИИ =====
+-- ===== CLICKWARP Р¤РЈРќРљР¦РР =====
 function FHA_initializeClickWarp()
     FHA.state.clickWarpFont = renderCreateFont("Tahoma", 10, 1 + 8)
     FHA.state.clickWarpFont2 = renderCreateFont("Arial", 8, 2 + 8)
@@ -4696,7 +4707,7 @@ function FHA_updateClickWarp()
     end
 end
 
--- ===== КОМАНДЫ ЧАТА =====
+-- ===== РљРћРњРђРќР”Р« Р§РђРўРђ =====
 function FHA_cmd_plmenu()
     if menu.visible then
         menu.visible = false
@@ -4720,19 +4731,19 @@ function FHA_cmd_pl(param)
     local st = FHA.state
     local now = os.clock()
     if now - st.lastSendTime < st.cooldown then
-        sampAddChatMessage("{FF0000}[FastReply] Подождите немного", -1)
+        sampAddChatMessage("{FF0000}[FastReply] РџРѕРґРѕР¶РґРёС‚Рµ РЅРµРјРЅРѕРіРѕ", -1)
         return
     end
     st.lastSendTime = now
     if not param or param == "" then
-        sampAddChatMessage("{FF0000}Использование: /pl [id] [код/текст]", -1)
+        sampAddChatMessage("{FF0000}РСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ: /pl [id] [РєРѕРґ/С‚РµРєСЃС‚]", -1)
         return
     end
     local space = param:find(" ")
     local id = tonumber(space and param:sub(1, space-1) or param)
     local txt = space and param:sub(space+1) or ""
     if not id or not sampIsPlayerConnected(id) then
-        sampAddChatMessage("{FF0000}Ошибка: игрок не найден", -1)
+        sampAddChatMessage("{FF0000}РћС€РёР±РєР°: РёРіСЂРѕРє РЅРµ РЅР°Р№РґРµРЅ", -1)
         return
     end
     local final = st.fastCodes[txt] or txt or ""
@@ -4777,19 +4788,19 @@ function FHA_cmd_invis()
     local st = FHA.state
     
     if not st.invisEnabled.v then
-        sampAddChatMessage("{FF4444}[FastHelperAdm] Функция невидимости не активирована в меню скрипта.", -1)
+        sampAddChatMessage("{FF4444}[FastHelperAdm] Р¤СѓРЅРєС†РёСЏ РЅРµРІРёРґРёРјРѕСЃС‚Рё РЅРµ Р°РєС‚РёРІРёСЂРѕРІР°РЅР° РІ РјРµРЅСЋ СЃРєСЂРёРїС‚Р°.", -1)
         return
     end
     if st.adminLevel.v < 6 then
-        sampAddChatMessage("{FF4444}[FastHelperAdm] Для использования невидимости требуется уровень администратора 6+.", -1)
+        sampAddChatMessage("{FF4444}[FastHelperAdm] Р”Р»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РЅРµРІРёРґРёРјРѕСЃС‚Рё С‚СЂРµР±СѓРµС‚СЃСЏ СѓСЂРѕРІРµРЅСЊ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР° 6+.", -1)
         return
     end
 
     st.invisActive = not st.invisActive
-    sampAddChatMessage("[{FF0000}FastHelperAdm{FFFFFF}] {ffff00}Невидимость " .. (st.invisActive and "{00ff00}Включено" or "{FF0000}Выключено"), -1)
+    sampAddChatMessage("[{FF0000}FastHelperAdm{FFFFFF}] {ffff00}РќРµРІРёРґРёРјРѕСЃС‚СЊ " .. (st.invisActive and "{00ff00}Р’РєР»СЋС‡РµРЅРѕ" or "{FF0000}Р’С‹РєР»СЋС‡РµРЅРѕ"), -1)
 end
 
--- ===== TRACER ЛОГИКА =====
+-- ===== TRACER Р›РћР“РРљРђ =====
 local FHA_font = nil
 
 function FHA_initializeTracer()
@@ -4922,7 +4933,7 @@ function FHA_TracerThread()
     end
 end
 
--- ===== АВТО ВВОД КОМАНД =====
+-- ===== РђР’РўРћ Р’Р’РћР” РљРћРњРђРќР” =====
 local function FHA_CheckAutoCommands()
     local st = FHA.state
     
@@ -5017,11 +5028,11 @@ local function FHA_CheckAutoCommands()
     end
 end
 
--- ===== ОБНОВЛЕНИЕ СИСТЕМЫ =====
+-- ===== РћР‘РќРћР’Р›Р•РќРР• РЎРРЎРўР•РњР« =====
 function FHA_updateSystem()
     local st = FHA.state
     
-    -- НОВЫЙ БЛОК ДЛЯ ADMIN RENDER
+    -- РќРћР’Р«Р™ Р‘Р›РћРљ Р”Р›РЇ ADMIN RENDER
     if adminRender.isMoving then
         adminRender.updateMove()
         if wasKeyPressed(vkeys.VK_RETURN) then
@@ -5044,7 +5055,7 @@ function FHA_updateSystem()
     FHA_CheckAutoCommands()
     
     if st.active_razd and not st.active_razd2 and st.razdTimeout > 0 and os.clock() > st.razdTimeout then
-        sampAddChatMessage("{FF5555}[FastHelperAdm] Раздача отменена - никто не ввел /rep " .. u8:decode(st.text_word.v), -1)
+        sampAddChatMessage("{FF5555}[FastHelperAdm] Р Р°Р·РґР°С‡Р° РѕС‚РјРµРЅРµРЅР° - РЅРёРєС‚Рѕ РЅРµ РІРІРµР» /rep " .. u8:decode(st.text_word.v), -1)
         FHA_resetRazdacha()
     end
     
@@ -5054,7 +5065,7 @@ function FHA_updateSystem()
         st.active_razd2 = false
         
         if not sampIsPlayerConnected(st.razd_player_id) then
-            sampAddChatMessage('{FF5555}[FastHelperAdm] Победитель вышел, раздача отменена.', -1)
+            sampAddChatMessage('{FF5555}[FastHelperAdm] РџРѕР±РµРґРёС‚РµР»СЊ РІС‹С€РµР», СЂР°Р·РґР°С‡Р° РѕС‚РјРµРЅРµРЅР°.', -1)
             FHA_resetRazdacha()
         else
             local idx = st.combo_priz.v + 1
@@ -5075,8 +5086,8 @@ function FHA_updateSystem()
 
                 if FHA.isUnloading then return end
                 local pm_message = isStyle
-                    and ('Поздравляем! Вы победили в раздаче! Вы выиграли стиль боя "'..prize..'"')
-                    or  ('Поздравляем! Вы победили в раздаче! Выиграли '..formatMoneySmart(amount)..' '..prize)
+                    and ('РџРѕР·РґСЂР°РІР»СЏРµРј! Р’С‹ РїРѕР±РµРґРёР»Рё РІ СЂР°Р·РґР°С‡Рµ! Р’С‹ РІС‹РёРіСЂР°Р»Рё СЃС‚РёР»СЊ Р±РѕСЏ "'..prize..'"')
+                    or  ('РџРѕР·РґСЂР°РІР»СЏРµРј! Р’С‹ РїРѕР±РµРґРёР»Рё РІ СЂР°Р·РґР°С‡Рµ! Р’С‹РёРіСЂР°Р»Рё '..formatMoneySmart(amount)..' '..prize)
                 sampSendChat('/pm '..st.razd_player_id..' '..pm_message..' | ' .. FHA.templates.pleasant_game())
                 wait(st.FLOOD_DELAY)
 
@@ -5090,7 +5101,7 @@ function FHA_updateSystem()
                 end
                 
                 local logMessage = string.format(
-                    'WINNER: %s[%d] | Слово: %s (%s) | %s',
+                    'WINNER: %s[%d] | РЎР»РѕРІРѕ: %s (%s) | %s',
                     nick,
                     st.razd_player_id,
                     st.razdWord,
@@ -5099,8 +5110,8 @@ function FHA_updateSystem()
                 )
                 
                 local announce_message = isStyle
-                    and ('РАЗДАЧА | WIN '..st.razd_player_id..'id выиграл стиль "'..prize..'"')
-                    or  ('РАЗДАЧА | WIN '..st.razd_player_id..'id')
+                    and ('Р РђР—Р”РђР§Рђ | WIN '..st.razd_player_id..'id РІС‹РёРіСЂР°Р» СЃС‚РёР»СЊ "'..prize..'"')
+                    or  ('Р РђР—Р”РђР§Рђ | WIN '..st.razd_player_id..'id')
                 
                 sampSendChat('/'..st.arr_chat[st.combo_chat.v+1]..' '..announce_message)
                 
@@ -5140,7 +5151,7 @@ function FHA_updateSystem()
     end
 end
 
--- ===== IMGUI ОБРАБОТЧИК =====
+-- ===== IMGUI РћР‘Р РђР‘РћРўР§РРљ =====
 function imgui.OnDrawFrame()
     FHA.isImguiInteracting = imgui.IsAnyItemActive() or imgui.IsWindowHovered(imgui.HoveredFlags_AnyWindow)
     
@@ -5154,7 +5165,7 @@ function imgui.OnDrawFrame()
         FHA.whPaused = false
         ShowCursor(false)
         imgui.Process = false
-        print("[FastHelperAdm][Imgui] Ошибка рисования:", err)
+        print("[FastHelperAdm][Imgui] РћС€РёР±РєР° СЂРёСЃРѕРІР°РЅРёСЏ:", err)
     end
 end
 
@@ -5162,7 +5173,7 @@ function onWindowMessage(msg, wparam, lparam)
     FHA_onWindowMessage(msg, wparam, lparam)
 end
 
--- ===== ВЫГРУЗКА СКРИПТА =====
+-- ===== Р’Р«Р“Р РЈР—РљРђ РЎРљР РРџРўРђ =====
 function script.unload()
     FHA.isUnloading = true
 
@@ -5197,10 +5208,10 @@ function script.unload()
         adminRender.stopMove(false)
     end
 
-    sampAddChatMessage("{33CCFF}[FastHelperAdm] Скрипт выгружен корректно", -1)
+    sampAddChatMessage("{33CCFF}[FastHelperAdm] РЎРєСЂРёРїС‚ РІС‹РіСЂСѓР¶РµРЅ РєРѕСЂСЂРµРєС‚РЅРѕ", -1)
 end
 
--- ===== ГЛАВНАЯ ФУНКЦИЯ =====
+-- ===== Р“Р›РђР’РќРђРЇ Р¤РЈРќРљР¦РРЇ =====
 function main()
     FHA_loadCfg()
     FHA.isUnloading = false
@@ -5263,13 +5274,13 @@ function main()
     lua_thread.create(FHA_gmCarThread)
     lua_thread.create(FHA_SpeedhackThread)
 
-    -- === ДОБАВИТЬ ЭТИ СТРОКИ ===
+    -- === Р”РћР‘РђР’РРўР¬ Р­РўР РЎРўР РћРљР ===
     lua_thread.create(adminRender.updateLoop)
     lua_thread.create(adminRender.autoUpdateLoop)
     adminRender.init()
     adminRender.loadPosition()
     adminRender.loadFilter()
-    -- === КОНЕЦ ДОБАВЛЕНИЯ ===
+    -- === РљРћРќР•Р¦ Р”РћР‘РђР’Р›Р•РќРРЇ ===
     
     FHA.threads.reportCleanup = lua_thread.create(FHA_reportCleanupThread)
 
@@ -5277,8 +5288,8 @@ function main()
 
     killList.init()
 
-    sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Скрипт {AA66FF}FastHelperAdm {999999}version 2.2 {CC88FF}успешно загружен", -1)
-    sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Для использования пропишите - {999999}/plmenu", -1)
+    sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}РЎРєСЂРёРїС‚ {AA66FF}FastHelperAdm {999999}version 2.2 {CC88FF}СѓСЃРїРµС€РЅРѕ Р·Р°РіСЂСѓР¶РµРЅ", -1)
+    sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Р”Р»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РїСЂРѕРїРёС€РёС‚Рµ - {999999}/plmenu", -1)
 
     FHA.threads.autosave = lua_thread.create(function()
         while not FHA.isUnloading do
@@ -5302,7 +5313,7 @@ function main()
         
         local success, err = pcall(function() Input:update() end)
         if not success then
-            print("[FastHelperAdm][Input] Ошибка в Input:update():", err)
+            print("[FastHelperAdm][Input] РћС€РёР±РєР° РІ Input:update():", err)
             Input:clear()
         end
         
