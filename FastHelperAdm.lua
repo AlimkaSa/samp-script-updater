@@ -16,11 +16,9 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== АВТООБНОВЛЕНИЕ (КАК В GRANDTOOLS) =====
--- Версия хранится ЗДЕСЬ (жёстко прописана)
-local CURRENT_VERSION = 2.2  -- ← ЭТО МЕНЯТЬ ПРИ ОБНОВЛЕНИИ!
-
+-- ===== АВТООБНОВЛЕНИЕ =====
 local function checkForUpdate()
+    local CURRENT_VERSION = 2.2  -- Версия на ПК
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
     local scriptName = "FastHelperAdm.lua"
     
@@ -87,23 +85,24 @@ local function checkForUpdate()
     print("[FastHelperAdm] Обновление установлено на версию " .. remoteNum .. "!")
     printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Версия " .. remoteNum, 3000)
     
-    -- Перезагружаем как в GrandTools
+    -- ПЕРЕЗАГРУЗКА (РАБОТАЕТ!)
     lua_thread.create(function()
         wait(1500)
-        -- Выгружаем старый скрипт
+        -- Получаем путь к текущему скрипту
+        local scriptPath = getWorkingDirectory() .. "\\" .. scriptName
+        -- Выгружаем ВСЕ копии скрипта
         for _, scr in ipairs(script.list()) do
             if scr.filename == scriptName then
                 scr:unload()
-                break
             end
         end
         wait(100)
-        -- Загружаем новый
-        script.load(getWorkingDirectory() .. "\\" .. scriptName)
+        -- Загружаем ЗАНОВО
+        script.load(scriptPath)
     end)
 end
 
--- Запускаем проверку через 3 секунды
+-- Запускаем проверку
 lua_thread.create(function()
     wait(3000)
     checkForUpdate()
