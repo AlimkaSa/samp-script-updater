@@ -16,63 +16,44 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ========== ВСТАВЬ СЮДА БЛОК АВТООБНОВЛЕНИЯ ==========
+-- ===== АВТООБНОВЛЕНИЕ ЧЕРЕЗ CURL (РАБОТАЕТ ВСЕГДА) =====
 local function checkForUpdate()
     local currentVersion = 2.1
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
     
+    -- Функция для скачивания текста через curl
     local function downloadText(url)
-        local cef = require("cef")
-        if not cef then return nil end
+        local tempFile = os.tmpname()
+        local command = 'curl -s --connect-timeout 5 "' .. url .. '" -o "' .. tempFile .. '"'
+        os.execute(command)
         
-        local result = nil
-        local finished = false
-        
-        cef.Request(url, function(data)
-            if data and data.StatusCode == 200 then
-                result = data.Body
-            end
-            finished = true
-        end)
-        
-        local timer = 0
-        while not finished and timer < 5000 do
-            wait(100)
-            timer = timer + 100
+        local file = io.open(tempFile, "r")
+        if file then
+            local content = file:read("*a")
+            file:close()
+            os.remove(tempFile)
+            return content
         end
-        return result
+        return nil
     end
     
+    -- Функция для скачивания файла через curl
     local function downloadFile(url, filename)
-        local cef = require("cef")
-        if not cef then return false end
+        local command = 'curl -s --connect-timeout 10 "' .. url .. '" -o "' .. filename .. '"'
+        os.execute(command)
         
-        local success = false
-        local finished = false
-        
-        cef.Request(url, function(data)
-            if data and data.StatusCode == 200 then
-                local file = io.open(filename, "w")
-                if file then
-                    file:write(data.Body)
-                    file:close()
-                    success = true
-                end
-            end
-            finished = true
-        end)
-        
-        local timer = 0
-        while not finished and timer < 10000 do
-            wait(100)
-            timer = timer + 100
+        local file = io.open(filename, "r")
+        if file then
+            file:close()
+            return true
         end
-        return success
+        return false
     end
     
+    -- Проверяем версию на GitHub
     local remoteVer = downloadText(repoURL .. "/version.txt")
     if not remoteVer then
-        print("[FastHelperAdm] Не удалось проверить обновления")
+        print("[FastHelperAdm] Не удалось проверить обновления (curl не найден?)")
         return
     end
     
@@ -84,6 +65,7 @@ local function checkForUpdate()
         return
     end
     
+    -- Если есть обновление
     if remoteNum > currentVersion then
         print(string.format("[FastHelperAdm] Найдено обновление! %s -> %s", currentVersion, remoteNum))
         
@@ -91,10 +73,12 @@ local function checkForUpdate()
         if downloadFile(repoURL .. "/fasthelperadm.lua", tempFile) then
             print("[FastHelperAdm] Новый скрипт скачан!")
             
+            -- Делаем бэкап старой версии
             if io.open("fasthelperadm.lua", "r") then
                 os.rename("fasthelperadm.lua", "fasthelperadm.lua.backup")
             end
             
+            -- Перемещаем новый скрипт
             os.rename(tempFile, "fasthelperadm.lua")
             
             print("[FastHelperAdm] Обновление применено! Перезагрузите скрипт командой /lua reload")
@@ -107,18 +91,20 @@ local function checkForUpdate()
     end
 end
 
+-- Запускаем проверку через 3 секунды после загрузки
 lua_thread.create(function()
     wait(3000)
     checkForUpdate()
 end)
 
+-- Проверяем раз в час
 lua_thread.create(function()
     while true do
         wait(3600000)
         checkForUpdate()
     end
 end)
--- ========== КОНЕЦ БЛОКА АВТООБНОВЛЕНИЯ ==========
+-- ===== КОНЕЦ БЛОКА АВТООБНОВЛЕНИЯ =====
 
 -- ===== ADMIN RENDER СТРУКТУРА =====
 local adminRender = {
