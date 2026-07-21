@@ -16,7 +16,7 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== АВТООБНОВЛЕНИЕ (ФИНАЛЬНАЯ ВЕРСИЯ) =====
+-- ===== АВТООБНОВЛЕНИЕ (ФИНАЛЬНАЯ ВЕРСИЯ 2) =====
 local function checkForUpdate()
     local CURRENT_VERSION = 2.2
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
@@ -66,7 +66,7 @@ local function checkForUpdate()
     -- Есть обновление!
     print(string.format("[FastHelperAdm] Найдено обновление! %s -> %s", CURRENT_VERSION, remoteNum))
     
-    -- Скачиваем в НОВЫЙ файл (не temp!)
+    -- Скачиваем в НОВЫЙ файл
     if not downloadFile(repoURL .. "/" .. scriptName, newScriptPath) then
         print("[FastHelperAdm] Ошибка скачивания!")
         return
@@ -80,7 +80,7 @@ local function checkForUpdate()
     end
     testFile:close()
     
-    -- Проверяем, что в скачанном файле правильная версия (чтобы защититься от ошибок GitHub)
+    -- Проверяем, что в скачанном файле правильная версия
     local newContent = io.open(newScriptPath, "r"):read("*a")
     if not newContent or not newContent:find("CURRENT_VERSION = 2.2") then
         print("[FastHelperAdm] Ошибка: скачанный файл содержит старую версию!")
@@ -88,37 +88,33 @@ local function checkForUpdate()
         return
     end
     
-    -- ===== САМАЯ ВАЖНАЯ ЧАСТЬ: ЗАМЕНА ФАЙЛА =====
-    
-    -- 1. УДАЛЯЕМ старый файл
-    if io.open(scriptPath, "r") then
-        os.remove(scriptPath)
-    end
-    
-    -- 2. ПЕРЕИМЕНОВЫВАЕМ новый в старый
-    -- Файл "FastHelperAdm_new.lua" станет "FastHelperAdm.lua"
-    local success = os.rename(newScriptPath, scriptPath)
-    
-    if not success then
-        print("[FastHelperAdm] Ошибка переименования файла!")
-        return
-    end
-    
     print("[FastHelperAdm] Обновление установлено на версию " .. remoteNum .. "!")
     printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Версия " .. remoteNum, 3000)
     
-    -- Перезагрузка скрипта
+    -- ===== ПРАВИЛЬНАЯ ПЕРЕЗАГРУЗКА =====
+    -- Мы не пытаемся удалить старый файл, потому что он заблокирован Windows.
+    -- Вместо этого мы просто говорим MoonLoader: "Выгрузи меня и загрузи новый файл".
+    
     lua_thread.create(function()
         wait(1500)
+        
+        local oldScript = nil
+        -- Находим текущий запущенный скрипт по имени
         for _, scr in ipairs(script.list()) do
-            if scr.filename == scriptPath or scr.filename:match("FastHelperAdm%.lua$") then
-                print("[FastHelperAdm] Выгружаю скрипт: " .. scr.filename)
-                scr:unload()
+            if scr.filename:match("FastHelperAdm%.lua$") then
+                oldScript = scr
                 break
             end
         end
-        wait(100)
-        script.load(scriptPath)
+
+        -- ВАЖНО: Загружаем НОВЫЙ файл, который мы скачали (FastHelperAdm_new.lua)
+        -- MoonLoader загрузит его, и он станет FastHelperAdm.lua
+        script.load(newScriptPath)
+        
+        -- А теперь выгружаем старый
+        if oldScript then
+            oldScript:unload()
+        end
     end)
 end
 
@@ -128,6 +124,7 @@ lua_thread.create(function()
     checkForUpdate()
 end)
 -- ===== КОНЕЦ АВТООБНОВЛЕНИЯ =====
+
 -- ===== ADMIN RENDER СТРУКТУРА =====
 local adminRender = {
     enabled = imgui.ImBool(false),
