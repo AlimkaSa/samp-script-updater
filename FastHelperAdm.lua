@@ -16,9 +16,9 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== АВТООБНОВЛЕНИЕ (С ПОДДЕРЖКОЙ ANSI) =====
+-- ===== АВТООБНОВЛЕНИЕ (ЧИСТОВОЙ ВАРИАНТ) =====
 local function checkForUpdate()
-    local CURRENT_VERSION = 2.2
+    local CURRENT_VERSION = 2.2  -- Версия на ПК
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
     local scriptName = "FastHelperAdm.lua"
     
@@ -27,7 +27,7 @@ local function checkForUpdate()
     local backupPath = scriptPath .. ".backup"
     local tempPath = scriptPath .. ".temp"
     
-    -- Функция для скачивания текста через curl (возвращает UTF-8)
+    -- Функция для скачивания текста через curl
     local function downloadText(url)
         local tempFile = os.tmpname()
         os.execute('curl -s --connect-timeout 5 "' .. url .. '" -o "' .. tempFile .. '"')
@@ -43,11 +43,9 @@ local function checkForUpdate()
     
     -- Функция для скачивания файла и конвертации в ANSI
     local function downloadFileANSI(url, filename)
-        -- Скачиваем во временный файл
         local tempFile = os.tmpname()
         os.execute('curl -s --connect-timeout 10 "' .. url .. '" -o "' .. tempFile .. '"')
         
-        -- Читаем содержимое (UTF-8)
         local file = io.open(tempFile, "r")
         if not file then
             os.remove(tempFile)
@@ -60,7 +58,6 @@ local function checkForUpdate()
         -- Конвертируем UTF-8 в ANSI (Windows-1251)
         local ansiContent = utf8ToAnsi(content)
         
-        -- Сохраняем в ANSI
         local outFile = io.open(filename, "w")
         if not outFile then
             return false
@@ -74,7 +71,6 @@ local function checkForUpdate()
     -- Функция конвертации UTF-8 → ANSI (Windows-1251)
     local function utf8ToAnsi(str)
         if not str then return "" end
-        -- Используем встроенную функцию MoonLoader для конвертации
         local encoding = require("encoding")
         if encoding then
             encoding.default = "CP1251"
@@ -82,18 +78,6 @@ local function checkForUpdate()
             local ansi = encoding.ANSI
             return ansi:decode(utf8:encode(str))
         end
-        
-        -- Если encoding не работает, пробуем через iconv
-        local iconv = require("iconv")
-        if iconv then
-            local cd = iconv.new("CP1251", "UTF-8")
-            local result, err = cd:iconv(str)
-            if result then
-                return result
-            end
-        end
-        
-        -- Если ничего не работает, возвращаем как есть
         return str
     end
     
@@ -110,7 +94,6 @@ local function checkForUpdate()
         return
     end
     
-    -- Есть обновление!
     print(string.format("[FastHelperAdm] Найдено обновление! %s -> %s", CURRENT_VERSION, remoteNum))
     
     -- Скачиваем и конвертируем в ANSI
@@ -127,7 +110,7 @@ local function checkForUpdate()
     end
     testFile:close()
     
-    -- Проверяем, что в скачанном файле правильная версия
+    -- Проверяем версию в скачанном файле
     local newContent = io.open(tempPath, "r"):read("*a")
     if not newContent or not newContent:find("CURRENT_VERSION = 2.2") then
         print("[FastHelperAdm] Ошибка: скачанный файл содержит старую версию!")
@@ -135,17 +118,17 @@ local function checkForUpdate()
         return
     end
     
-    -- Делаем бэкап
+    -- УДАЛЯЕМ старый файл (если есть)
     if io.open(scriptPath, "r") then
-        os.rename(scriptPath, backupPath)
+        os.remove(scriptPath)
     end
     
-    -- Перемещаем новый файл
+    -- ПЕРЕМЕЩАЕМ новый файл (переименовываем temp в основной)
     local success = os.rename(tempPath, scriptPath)
     
     if not success then
-        -- Если не получилось переименовать, копируем
-        print("[FastHelperAdm] Не удалось переименовать, копирую...")
+        -- Если не получилось переименовать, копируем содержимое
+        print("[FastHelperAdm] Копирую файл...")
         local newFile = io.open(scriptPath, "w")
         if newFile then
             newFile:write(newContent)
@@ -157,29 +140,33 @@ local function checkForUpdate()
     
     if not success then
         print("[FastHelperAdm] Ошибка замены файла!")
-        os.rename(backupPath, scriptPath)
         return
+    end
+    
+    -- УДАЛЯЕМ временный файл (на всякий случай)
+    if io.open(tempPath, "r") then
+        os.remove(tempPath)
     end
     
     print("[FastHelperAdm] Обновление установлено на версию " .. remoteNum .. "!")
     printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Версия " .. remoteNum, 3000)
     
-    -- Перезагрузка
+    -- ПЕРЕЗАГРУЗКА
     lua_thread.create(function()
         wait(1500)
+        -- Выгружаем ВСЕ копии скрипта
         for _, scr in ipairs(script.list()) do
             if scr.filename == scriptPath or scr.filename:match("FastHelperAdm%.lua$") then
-                print("[FastHelperAdm] Выгружаю скрипт: " .. scr.filename)
                 scr:unload()
-                break
             end
         end
         wait(100)
+        -- Загружаем новый скрипт
         script.load(scriptPath)
     end)
 end
 
--- Запускаем проверку
+-- Запускаем проверку через 3 секунды
 lua_thread.create(function()
     wait(3000)
     checkForUpdate()
