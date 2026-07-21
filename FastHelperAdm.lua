@@ -81,8 +81,8 @@ local function checkForUpdate()
             -- Перемещаем новый скрипт
             os.rename(tempFile, "FastHelperAdm.lua")
             
-            print("[FastHelperAdm] Обновление применено! Перезагрузите скрипт командой /lua reload")
-            printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~/lua reload", 5000)
+            print("[FastHelperAdm] Update nice! Reload script cmd /lua reload")
+            printStringNow("~g~FastHelperAdm~w~: ~y~Update dowloand!~n~~w~/lua reload", 5000)
         else
             print("[FastHelperAdm] Ошибка при скачивании обновления")
         end
