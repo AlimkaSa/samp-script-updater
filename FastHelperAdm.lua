@@ -16,17 +16,17 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== АВТООБНОВЛЕНИЕ (РАБОТАЕТ 100%) =====
+-- ===== АВТООБНОВЛЕНИЕ (ФИНАЛЬНАЯ ВЕРСИЯ) =====
 local function checkForUpdate()
     local CURRENT_VERSION = 2.2
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
     local scriptName = "FastHelperAdm.lua"
     
-    -- Получаем полный путь к скрипту
+    -- Получаем полный путь к скрипту в moonloader
     local scriptPath = getWorkingDirectory() .. "\\" .. scriptName
-    local tempPath = scriptPath .. ".temp"
+    local newScriptPath = getWorkingDirectory() .. "\\FastHelperAdm_new.lua"
     
-    -- Функция для скачивания текста через curl
+    -- Функция для скачивания через curl
     local function downloadText(url)
         local tempFile = os.tmpname()
         os.execute('curl -s --connect-timeout 5 "' .. url .. '" -o "' .. tempFile .. '"')
@@ -40,7 +40,6 @@ local function checkForUpdate()
         return nil
     end
     
-    -- Функция для скачивания файла
     local function downloadFile(url, filename)
         os.execute('curl -s --connect-timeout 10 "' .. url .. '" -o "' .. filename .. '"')
         local file = io.open(filename, "r")
@@ -49,19 +48,6 @@ local function checkForUpdate()
             return true
         end
         return false
-    end
-    
-    -- Функция конвертации UTF-8 → ANSI (Windows-1251)
-    local function utf8ToAnsi(str)
-        if not str then return "" end
-        local encoding = require("encoding")
-        if encoding then
-            encoding.default = "CP1251"
-            local utf8 = encoding.UTF8
-            local ansi = encoding.ANSI
-            return ansi:decode(utf8:encode(str))
-        end
-        return str
     end
     
     -- Проверяем версию на GitHub
@@ -80,54 +66,48 @@ local function checkForUpdate()
     -- Есть обновление!
     print(string.format("[FastHelperAdm] Найдено обновление! %s -> %s", CURRENT_VERSION, remoteNum))
     
-    -- Скачиваем в temp файл (UTF-8 с GitHub)
-    if not downloadFile(repoURL .. "/" .. scriptName, tempPath) then
+    -- Скачиваем в НОВЫЙ файл (не temp!)
+    if not downloadFile(repoURL .. "/" .. scriptName, newScriptPath) then
         print("[FastHelperAdm] Ошибка скачивания!")
         return
     end
     
     -- Проверяем, что скачалось
-    local testFile = io.open(tempPath, "r")
+    local testFile = io.open(newScriptPath, "r")
     if not testFile then
         print("[FastHelperAdm] Файл не скачан!")
         return
     end
     testFile:close()
     
-    -- Читаем содержимое (UTF-8)
-    local newContent = io.open(tempPath, "r"):read("*a")
+    -- Проверяем, что в скачанном файле правильная версия (чтобы защититься от ошибок GitHub)
+    local newContent = io.open(newScriptPath, "r"):read("*a")
     if not newContent or not newContent:find("CURRENT_VERSION = 2.2") then
         print("[FastHelperAdm] Ошибка: скачанный файл содержит старую версию!")
-        os.remove(tempPath)
+        os.remove(newScriptPath)
         return
     end
     
-    -- ===== КОНВЕРТАЦИЯ В ANSI =====
-    local ansiContent = utf8ToAnsi(newContent)
+    -- ===== САМАЯ ВАЖНАЯ ЧАСТЬ: ЗАМЕНА ФАЙЛА =====
     
-    -- УДАЛЯЕМ старый файл
+    -- 1. УДАЛЯЕМ старый файл
     if io.open(scriptPath, "r") then
         os.remove(scriptPath)
     end
     
-    -- ЗАПИСЫВАЕМ НОВЫЙ ФАЙЛ В ANSI (через io.open)
-    local newFile = io.open(scriptPath, "w")
-    if newFile then
-        newFile:write(ansiContent)
-        newFile:close()
-        print("[FastHelperAdm] Файл заменён на 2.2 в ANSI!")
-    else
-        print("[FastHelperAdm] Ошибка записи файла!")
+    -- 2. ПЕРЕИМЕНОВЫВАЕМ новый в старый
+    -- Файл "FastHelperAdm_new.lua" станет "FastHelperAdm.lua"
+    local success = os.rename(newScriptPath, scriptPath)
+    
+    if not success then
+        print("[FastHelperAdm] Ошибка переименования файла!")
         return
     end
-    
-    -- Удаляем temp файл
-    os.remove(tempPath)
     
     print("[FastHelperAdm] Обновление установлено на версию " .. remoteNum .. "!")
     printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Версия " .. remoteNum, 3000)
     
-    -- Перезагрузка
+    -- Перезагрузка скрипта
     lua_thread.create(function()
         wait(1500)
         for _, scr in ipairs(script.list()) do
@@ -142,13 +122,12 @@ local function checkForUpdate()
     end)
 end
 
--- Запускаем проверку
+-- Запускаем проверку через 3 секунды
 lua_thread.create(function()
     wait(3000)
     checkForUpdate()
 end)
 -- ===== КОНЕЦ АВТООБНОВЛЕНИЯ =====
-
 -- ===== ADMIN RENDER СТРУКТУРА =====
 local adminRender = {
     enabled = imgui.ImBool(false),
