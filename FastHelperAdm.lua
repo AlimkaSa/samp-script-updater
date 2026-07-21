@@ -16,7 +16,7 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== АВТООБНОВЛЕНИЕ (ФИНАЛЬНАЯ ВЕРСИЯ 2) =====
+-- ===== АВТООБНОВЛЕНИЕ (ФИНАЛЬНАЯ ВЕРСИЯ 3) =====
 local function checkForUpdate()
     local CURRENT_VERSION = 2.2
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
@@ -92,14 +92,10 @@ local function checkForUpdate()
     printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Версия " .. remoteNum, 3000)
     
     -- ===== ПРАВИЛЬНАЯ ПЕРЕЗАГРУЗКА =====
-    -- Мы не пытаемся удалить старый файл, потому что он заблокирован Windows.
-    -- Вместо этого мы просто говорим MoonLoader: "Выгрузи меня и загрузи новый файл".
-    
     lua_thread.create(function()
-        wait(1500)
+        wait(1500) -- Ждем, пока игрок увидит надпись в игре
         
         local oldScript = nil
-        -- Находим текущий запущенный скрипт по имени
         for _, scr in ipairs(script.list()) do
             if scr.filename:match("FastHelperAdm%.lua$") then
                 oldScript = scr
@@ -107,11 +103,13 @@ local function checkForUpdate()
             end
         end
 
-        -- ВАЖНО: Загружаем НОВЫЙ файл, который мы скачали (FastHelperAdm_new.lua)
-        -- MoonLoader загрузит его, и он станет FastHelperAdm.lua
+        -- 1. ЗАГРУЖАЕМ НОВЫЙ СКРИПТ
         script.load(newScriptPath)
         
-        -- А теперь выгружаем старый
+        -- 2. ЖДЕМ 1 СЕКУНДУ, чтобы новый скрипт полностью прогрузил свои стили и переменные!
+        wait(1000)
+        
+        -- 3. ТОЛЬКО ПОТОМ ВЫГРУЖАЕМ СТАРЫЙ
         if oldScript then
             oldScript:unload()
         end
