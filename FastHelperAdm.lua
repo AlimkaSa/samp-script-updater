@@ -76,28 +76,45 @@ local function checkForUpdate()
     end
     testFile:close()
     
-    -- Заменяем файл
-    if io.open(scriptName, "r") then
-        os.rename(scriptName, scriptName .. ".backup")
+    -- ЧИТАЕМ СОДЕРЖИМОЕ СКАЧАННОГО ФАЙЛА!
+    local newContent = io.open(tempFile, "r"):read("*a")
+    if not newContent or not newContent:find("CURRENT_VERSION = 2.2") then
+        print("[FastHelperAdm] Ошибка: скачанный файл содержит старую версию!")
+        return
     end
-    os.rename(tempFile, scriptName)
+    
+    -- УДАЛЯЕМ старый файл
+    if io.open(scriptName, "r") then
+        os.remove(scriptName)
+    end
+    
+    -- КОПИРУЕМ новый файл
+    local newFile = io.open(scriptName, "w")
+    if newFile then
+        newFile:write(newContent)
+        newFile:close()
+        print("[FastHelperAdm] Файл успешно заменён!")
+    else
+        print("[FastHelperAdm] Ошибка записи файла!")
+        return
+    end
+    
+    -- Удаляем временный файл
+    os.remove(tempFile)
     
     print("[FastHelperAdm] Обновление установлено на версию " .. remoteNum .. "!")
     printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Версия " .. remoteNum, 3000)
     
-    -- ПЕРЕЗАГРУЗКА (РАБОТАЕТ!)
+    -- ПЕРЕЗАГРУЗКА
     lua_thread.create(function()
         wait(1500)
-        -- Получаем путь к текущему скрипту
         local scriptPath = getWorkingDirectory() .. "\\" .. scriptName
-        -- Выгружаем ВСЕ копии скрипта
         for _, scr in ipairs(script.list()) do
             if scr.filename == scriptName then
                 scr:unload()
             end
         end
         wait(100)
-        -- Загружаем ЗАНОВО
         script.load(scriptPath)
     end)
 end
