@@ -19,7 +19,7 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== АВТООБНОВЛЕНИЕ ОТ BLASTHACK =====
+-- ===== АВТООБНОВЛЕНИЕ ОТ BLASTHACK (С КОНВЕРТАЦИЕЙ В ANSI) =====
 local enable_autoupdate = true
 local autoupdate_loaded = false
 local Update = nil
@@ -58,10 +58,30 @@ if enable_autoupdate then
                                         lua_thread.create(function() 
                                             wait(1000) 
                                             
-                                            -- ====== ИСПРАВЛЕНИЕ БЕСКОНЕЧНОГО ЦИКЛА ======
+                                            -- ====== КОНВЕРТАЦИЯ UTF-8 В ANSI ======
+                                            local encoding = require("encoding")
+                                            if encoding then
+                                                encoding.default = "CP1251"
+                                                local utf8 = encoding.UTF8
+                                                local ansi = encoding.ANSI
+                                                
+                                                -- Читаем скачанный файл, перекодируем, перезаписываем
+                                                local file = io.open(thisScript().path, "r")
+                                                if file then
+                                                    local content = file:read("*a")
+                                                    file:close()
+                                                    local ansiContent = ansi:decode(utf8:encode(content))
+                                                    local outFile = io.open(thisScript().path, "w")
+                                                    if outFile then
+                                                        outFile:write(ansiContent)
+                                                        outFile:close()
+                                                    end
+                                                end
+                                            end
+                                            -- ============================================
+
                                             local UPDATE_IN_PROGRESS = true
                                             thisScript():reload()
-                                            -- ============================================
                                         end)
                                     end
                                     if o==d.STATUSEX_ENDDOWNLOAD then 
@@ -102,7 +122,6 @@ if enable_autoupdate then
     end
 end
 -- ===== КОНЕЦ БЛОКА АВТООБНОВЛЕНИЯ =====
-
 -- ===== ADMIN RENDER СТРУКТУРА =====
 local adminRender = {
     enabled = imgui.ImBool(false),
