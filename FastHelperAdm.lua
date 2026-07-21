@@ -16,9 +16,10 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== АВТООБНОВЛЕНИЕ =====
+-- ===== АВТООБНОВЛЕНИЕ (КАК В GRANDTOOLS) =====
 local function checkForUpdate()
-    local currentVersion = 2.2
+    -- Версия берётся из script_version()!
+    local currentVersion = tonumber(script_version():match("(%d+%.%d+)")) or 2.1
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
     local scriptName = "FastHelperAdm.lua"
     
@@ -46,7 +47,7 @@ local function checkForUpdate()
         return false
     end
     
-    -- Проверяем версию
+    -- Проверяем версию на GitHub
     local remoteVer = downloadText(repoURL .. "/version.txt")
     if not remoteVer then
         return
@@ -83,11 +84,25 @@ local function checkForUpdate()
     os.rename(tempFile, scriptName)
     
     print("[FastHelperAdm] Обновление установлено на версию " .. remoteNum .. "!")
-    print("[FastHelperAdm] Перезагрузите скрипт (Ctrl+R) для применения")
-    printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Нажмите Ctrl+R", 4000)
+    printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Версия " .. remoteNum, 3000)
+    
+    -- ПЕРЕЗАГРУЖАЕМ КАК В GRANDTOOLS
+    lua_thread.create(function()
+        wait(1500)
+        -- Выгружаем старый скрипт
+        for _, scr in ipairs(script.list()) do
+            if scr.filename == scriptName then
+                scr:unload()
+                break
+            end
+        end
+        wait(100)
+        -- Загружаем новый
+        script.load(getWorkingDirectory() .. "\\" .. scriptName)
+    end)
 end
 
--- Запускаем проверку
+-- Запускаем проверку через 3 секунды
 lua_thread.create(function()
     wait(3000)
     checkForUpdate()
@@ -5232,7 +5247,7 @@ function main()
 
     killList.init()
 
-    sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Скрипт {AA66FF}FastHelperAdm {999999}version 2.2 {CC88FF}успешно загружен", -1)
+    sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Скрипт {AA66FF}FastHelperAdm {999999}version 2.1 {CC88FF}успешно загружен", -1)
     sampAddChatMessage("{CCCCCC}[INFORMATION] {CC88FF}Для использования пропишите - {999999}/plmenu", -1)
 
     FHA.threads.autosave = lua_thread.create(function()
