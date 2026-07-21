@@ -16,17 +16,16 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== АВТООБНОВЛЕНИЕ ЧЕРЕЗ CURL (РАБОТАЕТ ВСЕГДА) =====
+-- ===== АВТООБНОВЛЕНИЕ (КАК В GRANDTOOLS) =====
 local function checkForUpdate()
     local currentVersion = 2.2
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
+    local scriptName = "FastHelperAdm.lua"
     
-    -- Функция для скачивания текста через curl
+    -- Функция для скачивания через curl
     local function downloadText(url)
         local tempFile = os.tmpname()
-        local command = 'curl -s --connect-timeout 5 "' .. url .. '" -o "' .. tempFile .. '"'
-        os.execute(command)
-        
+        os.execute('curl -s --connect-timeout 5 "' .. url .. '" -o "' .. tempFile .. '"')
         local file = io.open(tempFile, "r")
         if file then
             local content = file:read("*a")
@@ -37,11 +36,8 @@ local function checkForUpdate()
         return nil
     end
     
-    -- Функция для скачивания файла через curl
     local function downloadFile(url, filename)
-        local command = 'curl -s --connect-timeout 10 "' .. url .. '" -o "' .. filename .. '"'
-        os.execute(command)
-        
+        os.execute('curl -s --connect-timeout 10 "' .. url .. '" -o "' .. filename .. '"')
         local file = io.open(filename, "r")
         if file then
             file:close()
@@ -50,61 +46,65 @@ local function checkForUpdate()
         return false
     end
     
-    -- Проверяем версию на GitHub
+    -- Проверяем версию
     local remoteVer = downloadText(repoURL .. "/version.txt")
     if not remoteVer then
-        print("[FastHelperAdm] Не удалось проверить обновления (curl не найден?)")
         return
     end
     
     remoteVer = remoteVer:gsub("%s+", "")
     local remoteNum = tonumber(remoteVer)
     
-    if not remoteNum then
-        print("[FastHelperAdm] Ошибка: неверный формат версии")
+    if not remoteNum or remoteNum <= currentVersion then
         return
     end
     
-    -- Если есть обновление
-    if remoteNum > currentVersion then
-        print(string.format("[FastHelperAdm] Найдено обновление! %s -> %s", currentVersion, remoteNum))
-        
-        local tempFile = "FastHelperAdm_temp.lua"
-        if downloadFile(repoURL .. "/FastHelperAdm.lua", tempFile) then
-            print("[FastHelperAdm] Новый скрипт скачан!")
-            
-            -- Делаем бэкап старой версии
-            if io.open("FastHelperAdm.lua", "r") then
-                os.rename("FastHelperAdm.lua", "FastHelperAdm.lua.backup")
-            end
-            
-            -- Перемещаем новый скрипт
-            os.rename(tempFile, "FastHelperAdm.lua")
-            
-            print("[FastHelperAdm] Update nice! Reload script cmd /lua reload")
-            printStringNow("~g~FastHelperAdm~w~: ~y~Update dowloand!~n~~w~/lua reload", 5000)
-        else
-            print("[FastHelperAdm] Ошибка при скачивании обновления")
-        end
-    else
-        print("[FastHelperAdm] У вас актуальная версия (" .. currentVersion .. ")")
+    -- Есть обновление!
+    print(string.format("[FastHelperAdm] Найдено обновление! %s -> %s", currentVersion, remoteNum))
+    
+    local tempFile = "FastHelperAdm_temp.lua"
+    if not downloadFile(repoURL .. "/FastHelperAdm.lua", tempFile) then
+        print("[FastHelperAdm] Ошибка скачивания!")
+        return
     end
+    
+    -- Проверяем, что скачалось
+    local testFile = io.open(tempFile, "r")
+    if not testFile then
+        print("[FastHelperAdm] Файл не скачан!")
+        return
+    end
+    testFile:close()
+    
+    -- Заменяем файл
+    if io.open(scriptName, "r") then
+        os.rename(scriptName, scriptName .. ".backup")
+    end
+    os.rename(tempFile, scriptName)
+    
+    print("[FastHelperAdm] Обновление установлено! Перезагрузка...")
+    printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Перезагрузка...", 3000)
+    
+    -- ПЕРЕЗАГРУЖАЕМ СКРИПТ (как в GrandTools)
+    lua_thread.create(function()
+        wait(1500)
+        -- Находим текущий скрипт и перезагружаем его
+        for _, scr in ipairs(script.list()) do
+            if scr.filename == scriptName then
+                scr:unload()
+                script.load(getWorkingDirectory() .. "\\" .. scriptName)
+                break
+            end
+        end
+    end)
 end
 
--- Запускаем проверку через 3 секунды после загрузки
+-- Запускаем проверку
 lua_thread.create(function()
     wait(3000)
     checkForUpdate()
 end)
-
--- Проверяем раз в час
-lua_thread.create(function()
-    while true do
-        wait(3600000)
-        checkForUpdate()
-    end
-end)
--- ===== КОНЕЦ БЛОКА АВТООБНОВЛЕНИЯ =====
+-- ===== КОНЕЦ АВТООБНОВЛЕНИЯ =====
 
 -- ===== ADMIN RENDER СТРУКТУРА =====
 local adminRender = {
