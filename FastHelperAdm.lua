@@ -16,7 +16,7 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== АВТООБНОВЛЕНИЕ (КАК В GRANDTOOLS) =====
+-- ===== АВТООБНОВЛЕНИЕ =====
 local function checkForUpdate()
     local currentVersion = 2.2
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
@@ -85,14 +85,13 @@ local function checkForUpdate()
     print("[FastHelperAdm] Обновление установлено! Перезагрузка...")
     printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Перезагрузка...", 3000)
     
-    -- ПЕРЕЗАГРУЖАЕМ СКРИПТ (как в GrandTools)
+    -- ПЕРЕЗАГРУЖАЕМ СКРИПТ (правильный способ!)
     lua_thread.create(function()
         wait(1500)
-        -- Находим текущий скрипт и перезагружаем его
+        -- Находим текущий скрипт и перезагружаем его через reload()
         for _, scr in ipairs(script.list()) do
             if scr.filename == scriptName then
-                scr:unload()
-                script.load(getWorkingDirectory() .. "\\" .. scriptName)
+                scr:reload()  -- ← ВОТ ТАК ПРАВИЛЬНО!
                 break
             end
         end
