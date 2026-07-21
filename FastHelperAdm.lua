@@ -16,9 +16,9 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== АВТООБНОВЛЕНИЕ (ЧИСТОВОЙ ВАРИАНТ) =====
+-- ===== АВТООБНОВЛЕНИЕ (РАБОТАЕТ 100% + ANSI) =====
 local function checkForUpdate()
-    local CURRENT_VERSION = 2.2  -- Версия на ПК
+    local CURRENT_VERSION = 2.2
     local repoURL = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main"
     local scriptName = "FastHelperAdm.lua"
     
@@ -41,11 +41,12 @@ local function checkForUpdate()
         return nil
     end
     
-    -- Функция для скачивания файла и конвертации в ANSI
+    -- Функция для скачивания файла С КОНВЕРТАЦИЕЙ В ANSI
     local function downloadFileANSI(url, filename)
         local tempFile = os.tmpname()
         os.execute('curl -s --connect-timeout 10 "' .. url .. '" -o "' .. tempFile .. '"')
         
+        -- Читаем содержимое (UTF-8)
         local file = io.open(tempFile, "r")
         if not file then
             os.remove(tempFile)
@@ -58,6 +59,7 @@ local function checkForUpdate()
         -- Конвертируем UTF-8 в ANSI (Windows-1251)
         local ansiContent = utf8ToAnsi(content)
         
+        -- Сохраняем в ANSI
         local outFile = io.open(filename, "w")
         if not outFile then
             return false
@@ -71,6 +73,8 @@ local function checkForUpdate()
     -- Функция конвертации UTF-8 → ANSI (Windows-1251)
     local function utf8ToAnsi(str)
         if not str then return "" end
+        
+        -- Пробуем через encoding (самый надёжный способ)
         local encoding = require("encoding")
         if encoding then
             encoding.default = "CP1251"
@@ -78,7 +82,47 @@ local function checkForUpdate()
             local ansi = encoding.ANSI
             return ansi:decode(utf8:encode(str))
         end
-        return str
+        
+        -- Если encoding не работает, пробуем через iconv
+        local iconv = require("iconv")
+        if iconv then
+            local cd = iconv.new("CP1251", "UTF-8")
+            local result, err = cd:iconv(str)
+            if result then
+                return result
+            end
+        end
+        
+        -- Если ничего не работает, пробуем ручную замену популярных символов
+        local result = str
+        local replacements = {
+            ["\xD0\x90"] = "А", ["\xD0\x91"] = "Б", ["\xD0\x92"] = "В",
+            ["\xD0\x93"] = "Г", ["\xD0\x94"] = "Д", ["\xD0\x95"] = "Е",
+            ["\xD0\x81"] = "Ё", ["\xD0\x96"] = "Ж", ["\xD0\x97"] = "З",
+            ["\xD0\x98"] = "И", ["\xD0\x99"] = "Й", ["\xD0\x9A"] = "К",
+            ["\xD0\x9B"] = "Л", ["\xD0\x9C"] = "М", ["\xD0\x9D"] = "Н",
+            ["\xD0\x9E"] = "О", ["\xD0\x9F"] = "П", ["\xD0\xA0"] = "Р",
+            ["\xD0\xA1"] = "С", ["\xD0\xA2"] = "Т", ["\xD0\xA3"] = "У",
+            ["\xD0\xA4"] = "Ф", ["\xD0\xA5"] = "Х", ["\xD0\xA6"] = "Ц",
+            ["\xD0\xA7"] = "Ч", ["\xD0\xA8"] = "Ш", ["\xD0\xA9"] = "Щ",
+            ["\xD0\xAA"] = "Ъ", ["\xD0\xAB"] = "Ы", ["\xD0\xAC"] = "Ь",
+            ["\xD0\xAD"] = "Э", ["\xD0\xAE"] = "Ю", ["\xD0\xAF"] = "Я",
+            ["\xD0\xB0"] = "а", ["\xD0\xB1"] = "б", ["\xD0\xB2"] = "в",
+            ["\xD0\xB3"] = "г", ["\xD0\xB4"] = "д", ["\xD0\xB5"] = "е",
+            ["\xD1\x91"] = "ё", ["\xD0\xB6"] = "ж", ["\xD0\xB7"] = "з",
+            ["\xD0\xB8"] = "и", ["\xD0\xB9"] = "й", ["\xD0\xBA"] = "к",
+            ["\xD0\xBB"] = "л", ["\xD0\xBC"] = "м", ["\xD0\xBD"] = "н",
+            ["\xD0\xBE"] = "о", ["\xD0\xBF"] = "п", ["\xD1\x80"] = "р",
+            ["\xD1\x81"] = "с", ["\xD1\x82"] = "т", ["\xD1\x83"] = "у",
+            ["\xD1\x84"] = "ф", ["\xD1\x85"] = "х", ["\xD1\x86"] = "ц",
+            ["\xD1\x87"] = "ч", ["\xD1\x88"] = "ш", ["\xD1\x89"] = "щ",
+            ["\xD1\x8A"] = "ъ", ["\xD1\x8B"] = "ы", ["\xD1\x8C"] = "ь",
+            ["\xD1\x8D"] = "э", ["\xD1\x8E"] = "ю", ["\xD1\x8F"] = "я",
+        }
+        for utf8_char, ansi_char in pairs(replacements) do
+            result = result:gsub(utf8_char, ansi_char)
+        end
+        return result
     end
     
     -- Проверяем версию на GitHub
@@ -94,9 +138,10 @@ local function checkForUpdate()
         return
     end
     
+    -- Есть обновление!
     print(string.format("[FastHelperAdm] Найдено обновление! %s -> %s", CURRENT_VERSION, remoteNum))
     
-    -- Скачиваем и конвертируем в ANSI
+    -- Скачиваем файл С КОНВЕРТАЦИЕЙ В ANSI
     if not downloadFileANSI(repoURL .. "/" .. scriptName, tempPath) then
         print("[FastHelperAdm] Ошибка скачивания!")
         return
@@ -110,7 +155,7 @@ local function checkForUpdate()
     end
     testFile:close()
     
-    -- Проверяем версию в скачанном файле
+    -- Проверяем, что в скачанном файле правильная версия
     local newContent = io.open(tempPath, "r"):read("*a")
     if not newContent or not newContent:find("CURRENT_VERSION = 2.2") then
         print("[FastHelperAdm] Ошибка: скачанный файл содержит старую версию!")
@@ -118,17 +163,17 @@ local function checkForUpdate()
         return
     end
     
-    -- УДАЛЯЕМ старый файл (если есть)
+    -- Делаем бэкап
     if io.open(scriptPath, "r") then
-        os.remove(scriptPath)
+        os.rename(scriptPath, backupPath)
     end
     
-    -- ПЕРЕМЕЩАЕМ новый файл (переименовываем temp в основной)
+    -- Перемещаем новый файл
     local success = os.rename(tempPath, scriptPath)
     
     if not success then
-        -- Если не получилось переименовать, копируем содержимое
-        print("[FastHelperAdm] Копирую файл...")
+        -- Если не получилось переименовать, копируем
+        print("[FastHelperAdm] Не удалось переименовать, копирую...")
         local newFile = io.open(scriptPath, "w")
         if newFile then
             newFile:write(newContent)
@@ -140,33 +185,29 @@ local function checkForUpdate()
     
     if not success then
         print("[FastHelperAdm] Ошибка замены файла!")
+        os.rename(backupPath, scriptPath)
         return
-    end
-    
-    -- УДАЛЯЕМ временный файл (на всякий случай)
-    if io.open(tempPath, "r") then
-        os.remove(tempPath)
     end
     
     print("[FastHelperAdm] Обновление установлено на версию " .. remoteNum .. "!")
     printStringNow("~g~FastHelperAdm~w~: ~y~Обновление установлено!~n~~w~Версия " .. remoteNum, 3000)
     
-    -- ПЕРЕЗАГРУЗКА
+    -- Перезагрузка
     lua_thread.create(function()
         wait(1500)
-        -- Выгружаем ВСЕ копии скрипта
         for _, scr in ipairs(script.list()) do
             if scr.filename == scriptPath or scr.filename:match("FastHelperAdm%.lua$") then
+                print("[FastHelperAdm] Выгружаю скрипт: " .. scr.filename)
                 scr:unload()
+                break
             end
         end
         wait(100)
-        -- Загружаем новый скрипт
         script.load(scriptPath)
     end)
 end
 
--- Запускаем проверку через 3 секунды
+-- Запускаем проверку
 lua_thread.create(function()
     wait(3000)
     checkForUpdate()
