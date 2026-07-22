@@ -3,11 +3,10 @@ script_name("FastHelperAdm")
 script_author("waldemar03 | Alim Akimov")
 script_version("2.1")
 
-local CURRENT_VERSION = 2.2
-
-local UPDATE_IN_PROGRESS = false
 require "lib.moonloader"
 require "lib.render"
+local dlstatus = require('moonloader').download_status -- Исправил опечатку dowload_status
+local inicfg = require 'inicfg'
 local imgui = require "imgui"
 local encoding = require "encoding"
 local vkeys = require 'vkeys'
@@ -19,109 +18,22 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== АВТООБНОВЛЕНИЕ ОТ BLASTHACK (С КОНВЕРТАЦИЕЙ В ANSI) =====
-local enable_autoupdate = true
-local autoupdate_loaded = false
-local Update = nil
+-- ===== ПЕРЕМЕННЫЕ АВТООБНОВЛЕНИЯ =====
+local script_vers = 2.2
+local script_vers_text = "2.2"
 
-if enable_autoupdate then
-    local updater_loaded, Updater = pcall(loadstring, [[return {check=function (a,b,c) 
-        local d=require('moonloader').download_status
-        local e=os.tmpname()
-        local f=os.clock()
-        if doesFileExist(e)then os.remove(e)end
-        
-        downloadUrlToFile(a,e,function(g,h,i,j)
-            if h==d.STATUSEX_ENDDOWNLOAD then 
-                if doesFileExist(e)then 
-                    local k=io.open(e,'r')
-                    if k then 
-                        local l=decodeJson(k:read('*a'))
-                        updatelink=l.updateurl
-                        updateversion=l.latest
-                        k:close()
-                        os.remove(e)
-                        
-                        if updateversion~=thisScript().version then 
-                            lua_thread.create(function(b)
-                                local d=require('moonloader').download_status
-                                local m=-1
-                                sampAddChatMessage(b..'Обнаружено обновление. Пытаюсь обновиться c '..thisScript().version..' на '..updateversion,m)
-                                wait(250)
-                                downloadUrlToFile(updatelink,thisScript().path,function(n,o,p,q)
-                                    if o==d.STATUS_DOWNLOADINGDATA then 
-                                        print(string.format('Загружено %d из %d.',p,q))
-                                    elseif o==d.STATUS_ENDDOWNLOADDATA then 
-                                        print('Загрузка обновления завершена.')
-                                        sampAddChatMessage(b..'Обновление завершено!',m)
-                                        goupdatestatus=true
-                                        lua_thread.create(function() 
-                                            wait(1000) 
-                                            
-                                            -- ====== КОНВЕРТАЦИЯ UTF-8 В ANSI ======
-                                            local encoding = require("encoding")
-                                            if encoding then
-                                                encoding.default = "CP1251"
-                                                local utf8 = encoding.UTF8
-                                                local ansi = encoding.ANSI
-                                                
-                                                -- Читаем скачанный файл, перекодируем, перезаписываем
-                                                local file = io.open(thisScript().path, "r")
-                                                if file then
-                                                    local content = file:read("*a")
-                                                    file:close()
-                                                    local ansiContent = ansi:decode(utf8:encode(content))
-                                                    local outFile = io.open(thisScript().path, "w")
-                                                    if outFile then
-                                                        outFile:write(ansiContent)
-                                                        outFile:close()
-                                                    end
-                                                end
-                                            end
-                                            -- ============================================
+local update_url = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main/version.json"
+local script_url = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main/FastHelperAdm.lua"
+local script_path = thisScript().path
 
-                                            local UPDATE_IN_PROGRESS = true
-                                            thisScript():reload()
-                                        end)
-                                    end
-                                    if o==d.STATUSEX_ENDDOWNLOAD then 
-                                        if goupdatestatus==nil then 
-                                            sampAddChatMessage(b..'Обновление прошло неудачно. Запускаю устаревшую версию..',m)
-                                            update=false 
-                                        end 
-                                    end
-                                end)
-                            end,b)
-                        else 
-                            update=false
-                            if UPDATE_IN_PROGRESS == nil or UPDATE_IN_PROGRESS == false then
-                                print('v'..thisScript().version..': Обновление не требуется.')
-                            else
-                                print('v'..thisScript().version..': Обновление успешно установлено!')
-                            end
-                        end
-                    end 
-                else 
-                    print('v'..thisScript().version..': Не могу проверить обновление. Смиритесь или проверьте самостоятельно на '..c)
-                    update=false 
-                end 
-            end
-        end)
-        
-        while update~=false and os.clock()-f<10 do wait(100)end
-        if os.clock()-f>=10 then print('v'..thisScript().version..': timeout, выходим из ожидания проверки обновления. Смиритесь или проверьте самостоятельно на '..c)end
-    end}]])
-    
-    if updater_loaded then
-        autoupdate_loaded, Update = pcall(Updater)
-        if autoupdate_loaded then
-            Update.json_url = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main/version.json?" .. tostring(os.clock())
-            Update.prefix = "[FastHelperAdm]: "
-            Update.url = "https://github.com/AlimkaSa/samp-script-updater/"
-        end
-    end
-end
--- ===== КОНЕЦ БЛОКА АВТООБНОВЛЕНИЯ =====
+-- ===== КОНФИГ ВЕРСИИ =====
+local cfg_path = getWorkingDirectory() .. "\\config\\FastHelperAdm.ini"
+local cfg = inicfg.load({}, cfg_path)
+if not cfg.Version then cfg.Version = {} end
+
+-- Читаем сохранённую версию из конфига, если нет — ставим текущую
+local local_ver = tonumber(cfg.Version.version) or script_vers
+
 -- ===== ADMIN RENDER СТРУКТУРА =====
 local adminRender = {
     enabled = imgui.ImBool(false),
@@ -5198,16 +5110,6 @@ function main()
     
     repeat wait(0) until isSampAvailable()
     
-    -- ===== ЗАПУСК ОБНОВЛЕНИЯ =====
-    if autoupdate_loaded and enable_autoupdate and Update then
-        if not UPDATE_IN_PROGRESS then
-            pcall(Update.check, Update.json_url, Update.prefix, Update.url)
-        else
-            UPDATE_IN_PROGRESS = false
-        end
-    end
-    -- ===== КОНЕЦ ЗАПУСКА =====
-
     sampRegisterChatCommand("plmenu", FHA_cmd_plmenu)
     sampRegisterChatCommand("pl", FHA_cmd_pl)
     sampRegisterChatCommand("lc", FHA_cmd_lc)
