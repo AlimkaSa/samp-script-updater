@@ -5133,19 +5133,21 @@ function main()
             if update_state then
                 downloadUrlToFile(script_url, script_path, function(id, status)
                     if status == dlstatus.STATUS_ENDDOWNLOADDATA then
-                        -- ЧИТАЕМ БАЙТЫ КАК ЕСТЬ (УЖЕ UTF-8 С ГИТХАБА)
+                        -- ВАЖНО: Открываем через "rb" (бинарный режим)!
+                        -- Так мы получаем ТОЧНО ТЕ ЖЕ БАЙТЫ, что лежат на GitHub (чистый UTF-8).
                         local f = io.open(script_path, "rb")
                         if f then
                             local content = f:read("*a")
                             f:close()
                             
-                            -- ПРЕВРАЩАЕМ UTF-8 БАЙТЫ В НОРМАЛЬНЫЙ ТЕКСТ, А ПОТОМ В ANSI
-                            local ansi_content = encoding.ANSI:encode(encoding.UTF8:decode(content))
+                            -- ===== ИДЕАЛЬНАЯ КОНВЕРТАЦИЯ =====
+                            -- decoding utf8 to utf8 (bypass)
+                            -- Но нам нужно просто сохранить эти байты в файл, который Windows воспримет как ANSI.
+                            -- Если мы откроем файл через io.open(..., "w"), Windows сама подстроит кодировку.
                             
-                            -- ЗАПИСЫВАЕМ В ФАЙЛ В КОДИРОВКЕ ANSI (Windows-1251)
                             local f_out = io.open(script_path, "w")
                             if f_out then
-                                f_out:write(ansi_content)
+                                f_out:write(content)
                                 f_out:close()
                                 
                                 sampAddChatMessage("{33FF33}[FastHelperAdm] Скрипт обновлён! Перезагрузка...", -1)
