@@ -5133,25 +5133,20 @@ function main()
             if update_state then
                 downloadUrlToFile(script_url, script_path, function(id, status)
                     if status == dlstatus.STATUS_ENDDOWNLOADDATA then
-                        -- ВАЖНО: Открываем через "rb" (бинарный режим)!
-                        -- Так мы получаем ТОЧНО ТЕ ЖЕ БАЙТЫ, что лежат на GitHub (чистый UTF-8).
+                        -- ВАЖНО: Читаем через "rb" (чистые байты UTF-8 с GitHub)
                         local f = io.open(script_path, "rb")
                         if f then
                             local content = f:read("*a")
                             f:close()
                             
-                            -- ===== ИДЕАЛЬНАЯ КОНВЕРТАЦИЯ =====
-                            -- decoding utf8 to utf8 (bypass)
-                            -- Но нам нужно просто сохранить эти байты в файл, который Windows воспримет как ANSI.
-                            -- Если мы откроем файл через io.open(..., "w"), Windows сама подстроит кодировку.
-                            
+                            -- Перезаписываем через "w" (это заставит Windows сохранить файл как ANSI)
                             local f_out = io.open(script_path, "w")
                             if f_out then
                                 f_out:write(content)
                                 f_out:close()
                                 
                                 sampAddChatMessage("{33FF33}[FastHelperAdm] Скрипт обновлён! Перезагрузка...", -1)
-                                wait(1000)
+                                -- Убрали wait(1000) и сделали мгновенную перезагрузку
                                 thisScript():reload()
                             end
                         end
