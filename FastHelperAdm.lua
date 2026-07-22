@@ -1,7 +1,7 @@
 -- FastHelperAdm v2.1 (ANSI, CP1251)
 script_name("FastHelperAdm")
 script_author("waldemar03 | Alim Akimov")
-script_version("2.1")
+script_version("2.2")
 
 require "lib.moonloader"
 require "lib.render"
@@ -18,13 +18,18 @@ require "samp.raknet"
 encoding.default = "CP1251"
 local u8 = encoding.UTF8
 
--- ===== ПЕРЕМЕННЫЕ АВТООБНОВЛЕНИЯ =====
-local script_vers = 2.2
+--- ===== АВТООБНОВЛЕНИЕ (ТОЧНО КАК В УРОКЕ) =====
+local update_state = false
+
+local script_vers = 2.2 -- Версия на ПК (будет меняться на 2.2 после обновления)
 local script_vers_text = "2.2"
 
-local update_url = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main/version.json"
+local update_url = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main/update.ini"
+local update_path = getWorkingDirectory() .. "\\update.ini"
+
 local script_url = "https://raw.githubusercontent.com/AlimkaSa/samp-script-updater/main/FastHelperAdm.lua"
 local script_path = thisScript().path
+-- ===== КОНЕЦ БЛОКА =====
 
 -- ===== КОНФИГ ВЕРСИИ =====
 local cfg_path = getWorkingDirectory() .. "\\config\\FastHelperAdm.ini"
@@ -5109,6 +5114,34 @@ function main()
     UpdateCyberColors()
     
     repeat wait(0) until isSampAvailable()
+
+        -- ===== ЗАПУСК АВТООБНОВЛЕНИЯ =====
+    downloadUrlToFile(update_url, update_path, function(id, status)
+        if status == dlstatus.STATUS_ENDDOWNLOADDATA then
+            local updateIni = inicfg.load(nil, update_path)
+            if updateIni and tonumber(updateIni.info.vers) > script_vers then
+                sampAddChatMessage("{33FF33}[FastHelperAdm] Есть обновление! Версия: " .. updateIni.info.vers_text, -1)
+                update_state = true
+            end
+            os.remove(update_path)
+        end
+    end)
+    
+    lua_thread.create(function()
+        while true do
+            wait(0)
+            if update_state then
+                downloadUrlToFile(script_url, script_path, function(id, status)
+                    if status == dlstatus.STATUS_ENDDOWNLOADDATA then
+                        sampAddChatMessage("{33FF33}[FastHelperAdm] Скрипт успешно обновлён!", -1)
+                        thisScript():reload()
+                    end
+                end)
+                break
+            end
+        end
+    end)
+    -- ===== КОНЕЦ ЗАПУСКА =====
     
     sampRegisterChatCommand("plmenu", FHA_cmd_plmenu)
     sampRegisterChatCommand("pl", FHA_cmd_pl)
