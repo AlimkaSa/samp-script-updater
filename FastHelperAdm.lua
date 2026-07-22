@@ -5133,24 +5133,26 @@ function main()
             if update_state then
                 downloadUrlToFile(script_url, script_path, function(id, status)
                     if status == dlstatus.STATUS_ENDDOWNLOADDATA then
-                        -- ЧИТАЕМ СКАЧАННЫЙ ФАЙЛ (с GitHub он всегда в UTF-8)
-                        local f = io.open(script_path, "r")
+                        -- ЧИТАЕМ СКАЧАННЫЙ ФАЙЛ В БИНАРНОМ РЕЖИМЕ ("rb")!
+                        -- Мы должны взять сырые байты (UTF-8), не позволяя Windows пытаться их прочитать как ANSI.
+                        local f = io.open(script_path, "rb")
                         if f then
                             local content = f:read("*a")
                             f:close()
                             
-                            -- ===== ВОЛШЕБСТВО: ПЕРЕКОДИРУЕМ UTF-8 В ANSI =====
-                            -- Сначала кодируем строку как UTF-8, потом декодируем в ANSI.
-                            -- Это единственный способ получить правильные русские буквы в ANSI.
-                            local ansi_content = encoding.ANSI:decode(encoding.UTF8:encode(content))
+                            -- ===== ПРАВИЛЬНАЯ КОНВЕРТАЦИЯ БЕЗ ДВОЙНОЙ ОШИБКИ =====
+                            -- content уже содержит чистый UTF-8 (байты, как на GitHub). 
+                            -- encoding.UTF8:decode(content) превращает эти UTF-8 байты в чистые русские буквы.
+                            -- А encoding.ANSI:encode(...) превращает их в байты для ANSI (Windows-1251).
+                            local ansi_content = encoding.ANSI:encode(encoding.UTF8:decode(content))
                             
-                            -- ЗАПИСЫВАЕМ ОБРАТНО (теперь файл будет в ANSI)
+                            -- ЗАПИСЫВАЕМ ОБРАТНО В ФАЙЛ (теперь он будет в ANSI)
                             local f_out = io.open(script_path, "w")
                             if f_out then
                                 f_out:write(ansi_content)
                                 f_out:close()
                                 
-                                sampAddChatMessage("{33FF33}[FastHelperAdm] Скрипт обновлён (ANSI)! Перезагрузка...", -1)
+                                sampAddChatMessage("{33FF33}[FastHelperAdm] Скрипт обновлён! Перезагрузка...", -1)
                                 wait(1000)
                                 thisScript():reload()
                             end
